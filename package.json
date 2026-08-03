@@ -1,0 +1,35 @@
+{
+  "name": "domovina-ulaznice",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "api": "wrangler dev",
+    "build": "tsc -b && vite build",
+    "preview": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "test": "node --no-warnings --import ./worker-tests/loader.mjs --test \"worker-tests/**/*.test.ts\"",
+    "test:types": "tsc -p worker-tests/tsconfig.json",
+    "db:local": "wrangler d1 execute domovina-ulaznice --local --file=migrations/0001_init.sql",
+    "db:remote": "wrangler d1 execute domovina-ulaznice --remote --file=migrations/0001_init.sql"
+  },
+  "dependencies": {
+    "hono": "^4.6.14",
+    "qrcode-generator": "^2.0.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "stripe": "^17.4.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241106.0",
+    "@types/node": "^22.19.21",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "wrangler": "^3.95.0"
+  }
+}

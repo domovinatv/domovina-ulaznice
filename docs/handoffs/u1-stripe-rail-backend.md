@@ -125,6 +125,9 @@ Uz to: `db-migrate.sh --dry-run` čist, drugi run migracije = no-op.
   Prod deploy **čeka vlasnika** (SSH + tajna) — v. §"Preostalo ručno".
 - **Commitovi:**
   - `domovina-api@4f7703f` — `feat(events): U1 Stripe rail — offchain naplata narudžbi ulaznica`
+  - `domovina-api@2ddac86` — `feat(events): refund_ticket_order` (dodano tijekom U2:
+    Worker mora moći poništiti ulaznice na povrat, a `void_ticket` traži
+    `auth.uid()` koji service ključ nema; detalji u [U2 Zapisniku](u2-javna-prodaja-web.md) §2.4)
   - `domovina-ulaznice` — ovaj Zapisnik.
 
 ### 1. Ugovor prema U2 (ovo je sve što Worker treba)

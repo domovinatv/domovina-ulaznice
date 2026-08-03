@@ -1,0 +1,18 @@
+{
+  "//": "Provjera tipova testova (npm run test:types). Testovi nisu dio deploya,",
+  "// ": "ali smiju otkriti da su se tipovi Workera promijenili.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": true,
+    "types": ["node", "@cloudflare/workers-types"]
+  },
+  "include": ["**/*.ts", "../worker/**/*.ts"]
+}

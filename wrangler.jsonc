@@ -1,0 +1,48 @@
+{
+  // domovina-ulaznice — javna prodaja ulaznica bez posrednika.
+  //
+  // Jedan Worker servira /api/* (Stripe rail + dostava ulaznica) i React SPA
+  // (ASSETS binding). Ticketing jezgra NIJE ovdje — ona živi u domovina-api
+  // (shema pinka_finance). D1 drži samo operativni trag: webhook log, poslane
+  // e-mailove i brand postavke prodajne stranice. Ulaznica, narudžbi i
+  // inventoryja u D1 NEMA i ne smije biti (docs/02-arhitektura.md §1).
+  "name": "domovina-ulaznice",
+  "main": "worker/index.ts",
+  "compatibility_date": "2024-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "domovina-ulaznice",
+      "database_id": "TODO-nakon-`wrangler d1 create domovina-ulaznice`"
+    }
+  ],
+  "kv_namespaces": [
+    // efemerni brojači (rate limit). Ništa domensko.
+    { "binding": "RL", "id": "TODO-nakon-`wrangler kv namespace create RL`" }
+  ],
+  "triggers": {
+    // rekoncilijacija: nesparene uplate, propušteni webhookovi, istekli holdovi
+    "crons": ["*/15 * * * *"]
+  },
+  "vars": {
+    "PUBLIC_BASE_URL": "https://ulaznice.domovina.ai",
+    "DOMOVINA_API_URL": "https://api.domovina.ai",
+    "EMAIL_FROM": "Domovina ulaznice <ulaznice@domovina.ai>",
+    "EMAIL_REPLY_TO": "podrska@domovina.ai",
+    // rate limit "koliko/sekundi" (worker/ratelimit.ts); prazno = zadano
+    "RL_ORDER_IP": "10/600",
+    "RL_WEBHOOK_IP": "300/60"
+  }
+  // Tajne (wrangler secret put):
+  //   STRIPE_SECRET_KEY             sk_test_… / sk_live_…
+  //   STRIPE_WEBHOOK_SECRET         whsec_… (Connect endpoint!)
+  //   EVENTS_STRIPE_CONFIRM_SECRET  ISTA vrijednost kao u domovina-api edge runtimeu
+  //   DOMOVINA_API_SERVICE_KEY      service_role ključ (nikad u SPA)
+  //   RESEND_API_KEY                bez njega mail ide u log, ne šalje se
+}

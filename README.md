@@ -6,9 +6,37 @@ Organizator prodaje ulaznice s vlastite stranice, novac ide **izravno na njegov
 Stripe račun** (Connect, `application_fee_amount = 0`), ulaznica je QR koji se
 skenira na ulazu. Platforma nikad ne drži novac i ne uzima proviziju s ulaznice.
 
-> Status: **PLANIRANJE** — u repou su za sada samo plan dokumenti (`docs/`).
-> Prvi kod kreće po handoffu [U1](docs/handoffs/u1-stripe-rail-backend.md).
+> Status: **U1 ✅ · U2 ✅ (kod gotov, čeka Stripe ključeve i deploy)**.
+> U1 je u `domovina-api` (Stripe rail u ticketing jezgri), U2 je ovaj Worker + SPA.
+> Što još treba vlasnik: [U2 Zapisnik](docs/handoffs/u2-javna-prodaja-web.md#zapisnik-izvršenja).
 > Datum plana: 2026-08-03.
+
+## Kako pokrenuti
+
+```
+worker/          Cloudflare Worker (Hono): Stripe rail, webhook, e-mail, cron
+  api.ts         klijent prema domovina-api (HMAC potpis za Stripe rail funkcije)
+  stripe.ts      direct charge checkout, refund, verifikacija webhook potpisa
+  webhooks.ts    POST /webhook/stripe — jedini izvor istine o plaćanju
+  mail.ts        dostava ulaznica (QR kao PNG privitak)
+  qr.ts          QR → PNG bez native ovisnosti (radi i u Workeru i u testu)
+  reconcile.ts   cron: propušteni webhookovi, neisporučene ulaznice, povrati
+src/             React SPA: događaj → kupnja → "moje ulaznice"
+migrations/      D1 — samo operativni trag (webhook log, mailovi, brand stranice)
+worker-tests/    node:test nad PRAVIM Workerom; nijedan test ne ide na mrežu
+```
+
+```bash
+npm install
+npm run api          # wrangler dev (Worker) na :8787
+npm run dev          # Vite (SPA) na :5174, /api proxy na Worker
+npm test             # 48 testova, bez mreže
+npm run build        # tsc + vite build → dist/ (Worker ga servira preko ASSETS)
+```
+
+Deploy i tajne: v. [U2 Zapisnik](docs/handoffs/u2-javna-prodaja-web.md#zapisnik-izvršenja).
+Webhook u Stripeu mora biti **Connect** endpoint — inače eventi ne nose
+`account: acct_…` i povrati se ne mogu izvesti.
 
 ## Zašto
 

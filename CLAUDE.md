@@ -9,7 +9,9 @@ Organizator prodaje s vlastite stranice, novac ide izravno na njegov Stripe rač
 (Connect **direct charge**, `application_fee_amount` se ne šalje), ulaznica je QR
 koji se skenira na ulazu.
 
-Status: **planiranje** — u repou su samo `docs/`. Prvi kod: `docs/handoffs/u1-…`.
+Status: **U1 ✅ (u `domovina-api`) · U2 ✅ (ovaj repo: `worker/` + `src/`)**.
+Oba čekaju vlasnika za deploy (SSH, Stripe TEST ključevi, Cloudflare projekt) —
+popis je u Zapisnicima izvršenja u `docs/handoffs/`.
 
 ## Prvo pročitaj
 
@@ -31,9 +33,10 @@ Status: **planiranje** — u repou su samo `docs/`. Prvi kod: `docs/handoffs/u1-
    (gdje je dokaz sam blockchain), ovdje je jedini dokaz uplate Stripe potpis koji
    verificira Worker. Otvorena funkcija = besplatne ulaznice.
 
-## Stack (planiran)
+## Stack
 
-- Worker + Hono + D1 (operativni podaci) + React SPA → Cloudflare
+- Worker + Hono + D1 (operativni podaci) + KV (rate limit) + React SPA → Cloudflare
+  - `npm test` (48 testova, node:test, **nikad na mrežu**), `npm run build`, `npm run api`
 - Ticketing: `domovina-api` edge funkcije `events-*`
 - Računi: `InvoiceProvider` (organizator | fira | domovina_fiskal)
 

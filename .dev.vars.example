@@ -1,0 +1,17 @@
+# Lokalne tajne za `wrangler dev` (kopiraj u .dev.vars — gitignoriran).
+# Iste vrijednosti idu u produkciju kroz `wrangler secret put`.
+
+# Stripe TEST ključevi (Connect uključen)
+STRIPE_SECRET_KEY=sk_test_...
+# `stripe listen --forward-to localhost:8787/webhook/stripe` ispiše whsec_
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# ISTA vrijednost kao EVENTS_STRIPE_CONFIRM_SECRET u domovina-api edge runtimeu.
+# Bez nje events-stripe-* vraćaju 503; s krivom → 401.
+EVENTS_STRIPE_CONFIRM_SECRET=
+
+# service_role ključ domovina-api (NIKAD u SPA bundle)
+DOMOVINA_API_SERVICE_KEY=
+
+# Bez ključa e-mail se ne šalje nego samo logira (dev).
+RESEND_API_KEY=

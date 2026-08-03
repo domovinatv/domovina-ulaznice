@@ -1,0 +1,16 @@
+{
+  "//": "Worker + vite config. Tipovi Cloudflare runtimea, bez DOM-a.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "types": ["@cloudflare/workers-types", "node"]
+  },
+  "include": ["worker", "vite.config.ts"]
+}

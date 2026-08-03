@@ -170,6 +170,21 @@ kojom je plaćeno. Povrat je vidljiv u roku od nekoliko radnih dana, ovisno o ba
 
 // --------------------------------------------------------------------- slanje
 
+/**
+ * Odredište Resend API-ja. `RESEND_API_BASE` služi ISKLJUČIVO lokalnom razvoju
+ * (hvatanje poruka umjesto stvarnog slanja) i, kao kod Stripea, prihvaća samo
+ * localhost — inače bi bila način da poruke s ulaznicama odu na tuđi host.
+ */
+export function resendBase(env: Env): string {
+  const raw = env.RESEND_API_BASE;
+  if (!raw) return "https://api.resend.com";
+  const u = new URL(raw);
+  if (u.protocol !== "http:" || (u.hostname !== "127.0.0.1" && u.hostname !== "localhost")) {
+    throw new Error("RESEND_API_BASE smije pokazivati samo na localhost");
+  }
+  return raw.replace(/\/$/, "");
+}
+
 export async function sendEmail(
   env: Env,
   p: {
@@ -193,11 +208,12 @@ export async function sendEmail(
   }
 
   // Jedan ponovni pokušaj na 5xx/429 i na pucanje mreže; 4xx je naša greška.
+  const endpoint = `${resendBase(env)}/emails`;
   let last = "nepoznata greška";
   for (let attempt = 1; attempt <= 2; attempt++) {
     let status = 0;
     try {
-      const r = await fetch("https://api.resend.com/emails", {
+      const r = await fetch(endpoint, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${env.RESEND_API_KEY}`,

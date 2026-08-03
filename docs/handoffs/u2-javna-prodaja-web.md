@@ -251,6 +251,36 @@ poslan je stvarnoj `events-stripe-confirm` funkciji na lokalnom stacku → **200
 `bad_signature`**. Dvije neovisne implementacije HMAC-a (Deno `crypto.subtle` u
 funkciji, Web Crypto u Workeru) slažu se bajt u bajt.
 
+**Živi lokalni prolaz (2026-08-03, nakon prve verifikacije):** cijeli tok je
+pokrenut i u browseru — `wrangler dev` (**pravi workerd**, pravi lokalni D1),
+prave `events-*` funkcije nad pravim Postgresom, pravi Chrome. Stripe i Resend
+su bili lokalni mockovi (nema ključeva), ali webhook potpis je **pravi HMAC**
+koji verificira Stripe SDK. Izvještaj sa snimkama:
+[`docs/izvjestaji/2026-08-03-lokalni-test-u1-u2.pdf`](../izvjestaji/2026-08-03-lokalni-test-u1-u2.pdf).
+
+Dodatno dokazano tim prolazom:
+
+- QR iz poslanog e-maila **dekodiran neovisnim čitačem** → nosi `dgdj1:` prefiks,
+  a sha256 tokena odgovara `qr_token_hash` u bazi; plaintext u bazi više ne postoji.
+- Taj isti token proslijeđen `redeem_ticket`-u: **prvi sken prolazi, drugi je
+  odbijen** uz vrijeme prvog ulaska. Petlja kupnja → e-mail → QR → ulaz je zatvorena.
+- `expired_sold_out` je stvarno okinuo povrat na `acct_…` bez `reverse_transfer`
+  i `refund_application_fee`, uz e-mail isprike.
+- D1 nakon svega sadrži samo `webhook_events`, `sent_emails`, `payment_log`,
+  `event_pages`, `pending_deliveries` — nijednu ulaznicu ni narudžbu.
+
+**Bug koji su testovi propustili, a pokretanje uhvatilo:** Worker je prema
+`events-order` slao `Authorization` sa service ključem; ta funkcija na prisutan
+Authorization prelazi na "user klijent" granu i zove `auth.getUser()` — za nas
+pogrešan put (web kupac je gost) i 500 ako u okruženju funkcije nema
+`SUPABASE_ANON_KEY`. Ispravak: prema `events-*` ide **samo `apikey`**. Dodan
+regresijski test (ukupno 49).
+
+**Dev-only seam:** `STRIPE_API_BASE` i `RESEND_API_BASE` preusmjeravaju te dva
+API-ja na lokalni mock. Oba prihvaćaju **isključivo** `http://127.0.0.1:*` /
+`http://localhost:*` — svaka druga vrijednost ruši poziv, da varijabla ne postane
+način da se plaćanja ili ulaznice pošalju na tuđi host.
+
 **Nije verificirano:** stvarni Stripe Checkout i webhook s pravim potpisom
 (nema TEST ključeva), stvarna dostava Resendom (nema ključa ni verificirane
 domene), ponašanje na Cloudflareu (nema projekta), Lighthouse.

@@ -2,7 +2,7 @@
 // najvažnije — `acct_…` ne smije izaći prema browseru.
 import { strict as assert } from "node:assert";
 import { afterEach, test } from "node:test";
-import { ACCT, CAMPAIGN, TIER, TIER_IMENSKA, call, callJson, testEnv, type TestCtx } from "./harness/env.ts";
+import { ACCT, CAMPAIGN, SERVICE_KEY, TIER, TIER_IMENSKA, call, callJson, testEnv, type TestCtx } from "./harness/env.ts";
 
 let t: TestCtx | null = null;
 afterEach(() => { t?.restore(); t = null; });
@@ -130,4 +130,15 @@ test("događaj bez aktivne naplate ostaje VIDLJIV, samo nije kupiv", async () =>
   assert.equal(status, 200);
   assert.equal(body.title, "Susret 2027");
   assert.equal(body.kupovno, false);
+});
+
+test("prema events-* NE šaljemo Authorization (events-order bi prešao na user-client granu)", async () => {
+  t = testEnv();
+  await call(t, "/api/narudzba", { body: narudzba() });
+  const fn = t.calls.filter((c) => c.url.includes("/functions/v1/"));
+  assert.ok(fn.length >= 3, "očekujemo feed + order + intent");
+  for (const c of fn) {
+    assert.equal(c.headers.authorization, undefined, `${c.url} nosi Authorization`);
+    assert.equal(c.headers.apikey, SERVICE_KEY, `${c.url} mora nositi apikey (Kong)`);
+  }
 });

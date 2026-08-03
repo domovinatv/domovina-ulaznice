@@ -21,13 +21,38 @@ import { HttpError } from "./env";
 /** Stripe checkout dopušta `expires_at` najranije +30 min (naša rezervacija je 20). */
 export const CHECKOUT_TTL_MIN = 30;
 
+/**
+ * Preusmjeravanje Stripe API-ja na lokalni mock (`stripe-mock` ili naš shim) —
+ * ISKLJUČIVO za lokalni razvoj bez pravih ključeva.
+ *
+ * Guard: prihvaća samo `http://127.0.0.1:*` i `http://localhost:*`. Bez toga bi
+ * ova varijabla bila način da se plaćanja preusmjere na tuđi host — zato svaka
+ * druga vrijednost ruši poziv umjesto da ga tiho pošalje drugamo.
+ */
+export function localStripeTarget(env: Env): { host: string; port: number; protocol: "http" } | null {
+  const raw = env.STRIPE_API_BASE;
+  if (!raw) return null;
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    throw new HttpError(500, "stripe_api_base_invalid", "STRIPE_API_BASE nije valjan URL");
+  }
+  if (u.protocol !== "http:" || (u.hostname !== "127.0.0.1" && u.hostname !== "localhost")) {
+    throw new HttpError(500, "stripe_api_base_forbidden", "STRIPE_API_BASE smije pokazivati samo na localhost");
+  }
+  return { host: u.hostname, port: Number(u.port || 80), protocol: "http" };
+}
+
 export function stripeClient(env: Env): Stripe {
   if (!env.STRIPE_SECRET_KEY) {
     throw new HttpError(503, "stripe_not_configured", "STRIPE_SECRET_KEY nije postavljen");
   }
+  const local = localStripeTarget(env);
   return new Stripe(env.STRIPE_SECRET_KEY, {
     apiVersion: "2025-02-24.acacia",
     httpClient: Stripe.createFetchHttpClient(),
+    ...(local ? { host: local.host, port: local.port, protocol: local.protocol } : {}),
   });
 }
 

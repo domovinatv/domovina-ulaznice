@@ -51,9 +51,14 @@ async function callFunction<T>(
     }
     headers[SIGNATURE_HEADER] = await signBody(env.EVENTS_STRIPE_CONFIRM_SECRET, raw);
   }
+  // Samo `apikey` (Kong), NIKAD `Authorization`. Sve `events-*` funkcije imaju
+  // verify_jwt=false i unutra dižu vlastiti service klijent, a events-order na
+  // prisutan Authorization header prelazi na "user klijent" granu i zove
+  // auth.getUser() — za nas je to pogrešan put (web kupac je gost, bez računa)
+  // i suvišan round trip. Provjereno pokretanjem: uz Authorization funkcija
+  // pukne ako u njezinu okruženju nema SUPABASE_ANON_KEY.
   if (env.DOMOVINA_API_SERVICE_KEY) {
     headers.apikey = env.DOMOVINA_API_SERVICE_KEY;
-    headers.Authorization = `Bearer ${env.DOMOVINA_API_SERVICE_KEY}`;
   }
 
   const res = await fetch(`${env.DOMOVINA_API_URL}/functions/v1/${name}`, {
@@ -234,9 +239,7 @@ export interface TicketRow {
 
 export const feed = (env: Env, params = ""): Promise<{ events: FeedEvent[] }> =>
   fetch(`${env.DOMOVINA_API_URL}/functions/v1/events-feed${params}`, {
-    headers: env.DOMOVINA_API_SERVICE_KEY
-      ? { apikey: env.DOMOVINA_API_SERVICE_KEY, Authorization: `Bearer ${env.DOMOVINA_API_SERVICE_KEY}` }
-      : {},
+    headers: env.DOMOVINA_API_SERVICE_KEY ? { apikey: env.DOMOVINA_API_SERVICE_KEY } : {},
   }).then(async (r) => {
     if (!r.ok) throw new HttpError(502, "api_feed_error", `events-feed: ${r.status}`);
     return (await r.json()) as { events: FeedEvent[] };

@@ -18,6 +18,12 @@ export interface Env {
   RL_ORDER_IP?: string;
   RL_WEBHOOK_IP?: string;
 
+  // ⚠️ SAMO lokalni razvoj: preusmjeravanje vanjskih API-ja na mock.
+  // Oba prihvaćaju isključivo http://127.0.0.1:* / http://localhost:* — svaka
+  // druga vrijednost ruši poziv (v. stripe.ts::localStripeTarget, mail.ts::resendBase).
+  STRIPE_API_BASE?: string;
+  RESEND_API_BASE?: string;
+
   // tajne (wrangler secret put)
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;

@@ -119,7 +119,7 @@ bez mreže — obrazac `rodjendaonice/apps/marketplace/worker-tests/`.
   protiv pravog Stripea** (nedostaju TEST ključevi i Cloudflare projekt —
   §5 Preostalo ručno).
 - **Commitovi:**
-  - `domovina-ulaznice` — Worker + SPA + D1 + 48 testova (ovaj commit).
+  - `domovina-ulaznice` — Worker + SPA + D1 + 50 testova (`985e1d3`, `a3b71a8`, `af154b5`).
   - `domovina-api@2ddac86` — `refund_ticket_order` RPC (v. §2 odluka 4).
 
 ### 1. Rute i ugovor prema U3/U4
@@ -223,7 +223,7 @@ vidi narudžbu; prijave nema.
 
 ### 4. Verifikacija (što je stvarno prošlo)
 
-`npm test` — **48/48**, `npm run test:types` i `npx tsc -b` čisti, `npm run build`
+`npm test` — **50/50**, `npm run test:types` i `npx tsc -b` čisti, `npm run build`
 prolazi. Testovi voze **pravi** `worker/index.ts` kroz HTTP sučelje, nad D1
 shimom koji koristi **pravu** `migrations/0001_init.sql`.
 

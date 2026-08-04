@@ -30,7 +30,7 @@ worker-tests/    node:test nad PRAVIM Workerom; nijedan test ne ide na mrežu
 npm install
 npm run api          # wrangler dev (Worker) na :8787
 npm run dev          # Vite (SPA) na :5174, /api proxy na Worker
-npm test             # 48 testova, bez mreže
+npm test             # 50 testova, bez mreže
 npm run build        # tsc + vite build → dist/ (Worker ga servira preko ASSETS)
 ```
 
@@ -76,6 +76,7 @@ platio i inače.
 | 05  | [Podatkovni model](docs/05-podatkovni-model.md)                 | što postoji u `pinka_finance`, što je novo za Stripe rail    |
 | 06  | [Faze i roadmap](docs/06-faze-roadmap.md)                       | U1–U6, ovisnosti, definicija MVP-a                           |
 | 07  | [Prior art i reuse mapa](docs/07-prior-art-reuse-mapa.md)       | što se kopira iz kojeg repoa i zašto                         |
+|     | [Nalazi lokalne verifikacije](docs/2026-08-04-lokalna-verifikacija-i-nalazi.md) | odbačene alternative, zamke, mjerenja, otvoreno |
 |     | [Handoffi](docs/handoffs/README.md)                             | samodostatni promptovi po fazi                               |
 
 ## Stack (planiran)

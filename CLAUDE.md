@@ -36,7 +36,7 @@ popis je u Zapisnicima izvršenja u `docs/handoffs/`.
 ## Stack
 
 - Worker + Hono + D1 (operativni podaci) + KV (rate limit) + React SPA → Cloudflare
-  - `npm test` (48 testova, node:test, **nikad na mrežu**), `npm run build`, `npm run api`
+  - `npm test` (50 testova, node:test, **nikad na mrežu**), `npm run build`, `npm run api`
 - Ticketing: `domovina-api` edge funkcije `events-*`
 - Računi: `InvoiceProvider` (organizator | fira | domovina_fiskal)
 

@@ -24,11 +24,17 @@ Zapisnik izvršenja      ★ agent ga popunjava na kraju — ugovor prema idućo
 | #   | Handoff                                                     | Repo                              | Ovisi o | Status |
 | --- | ------------------------------------------------------------ | --------------------------------- | ------- | ------ |
 | U1  | [Stripe rail u backendu](u1-stripe-rail-backend.md)         | `domovina-api`                    | —       | ✅ (lokalno verificirano; prod deploy čeka vlasnika) |
-| U2  | [Javna prodaja end-to-end](u2-javna-prodaja-web.md)         | ovaj repo                         | U1      | ✅ (kod + 48 testova; čeka Stripe ključeve i deploy) |
+| U2  | [Javna prodaja end-to-end](u2-javna-prodaja-web.md)         | ovaj repo                         | U1      | ✅ (kod + 50 testova; čeka Stripe ključeve i deploy) |
 | U3  | [Organizator self-service](u3-organizator-dashboard.md)     | ovaj repo (+ `domovina-api`)      | U2      | ⬜     |
 | U4  | [Check-in PWA](u4-checkin-pwa.md)                           | ovaj repo                         | U2      | ⬜     |
 | U5  | [Računi / fiskalizacija](u5-racuni-fiskalizacija.md)        | ovaj repo (+ `domovina-fiskal`)   | U3, U4  | ⬜     |
 | U6  | [airKUNA rail](u6-airkuna-rail.md)                          | ovaj repo + `safe-wallet-monorepo`| U2      | ⬜     |
+
+## Nalazi iz izvršenja
+
+- [2026-08-04 — Lokalna verifikacija U1+U2](../2026-08-04-lokalna-verifikacija-i-nalazi.md)
+  — odbačene alternative, zamke, mjerenja, otvorene stavke, redoslijed deploya.
+- [Izvještaj sa snimkama (PDF)](../izvjestaji/2026-08-04-lokalni-test-u1-u2.pdf)
 
 ## Pravila za svakog agenta
 

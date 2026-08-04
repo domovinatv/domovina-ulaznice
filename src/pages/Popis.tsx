@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { datumHr, dohvatiDogadjaje, eur, poruka, type EventView } from "../lib/api";
+import { dohvatiDogadjaje, eur, poruka, terminHr, type EventView } from "../lib/api";
 
 export default function Popis() {
   const [events, setEvents] = useState<EventView[] | null>(null);
@@ -28,7 +28,7 @@ export default function Popis() {
             <h2 style={{ margin: "0 0 6px" }}>
               <Link to={`/dogadjaj/${ev.slug}`}>{ev.title}</Link>
             </h2>
-            <p className="meta">{datumHr(ev.event?.starts_at ?? null, ev.event?.timezone)}</p>
+            <p className="meta">{terminHr(ev.event?.starts_at ?? null, ev.event?.ends_at ?? null, ev.event?.timezone)}</p>
             <p className="meta">
               {[ev.event?.venue_name, ev.event?.venue_city].filter(Boolean).join(", ")}
             </p>

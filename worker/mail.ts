@@ -33,6 +33,7 @@ export interface EventInfo {
   title: string;
   slug: string;
   starts_at: string | null;
+  ends_at?: string | null;
   timezone: string | null;
   venue_name: string | null;
   venue_city: string | null;
@@ -46,19 +47,38 @@ export const esc = (s: unknown): string =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
-export function formatWhenHr(startsAt: string | null, timeZone: string | null): string {
+/**
+ * Termin za e-mail. Ista konvencija kao u SPA (`src/lib/api.ts::terminHr`):
+ * vrijeme 00:00 znači "satnica još nije objavljena" pa se prikazuje samo datum,
+ * a višednevni događaj kao raspon. Bolje nego kupcu poslati "u 00:00".
+ */
+export function formatWhenHr(
+  startsAt: string | null,
+  timeZone: string | null,
+  endsAt: string | null = null,
+): string {
   if (!startsAt) return "termin još nije objavljen";
-  const d = new Date(startsAt);
-  if (Number.isNaN(d.getTime())) return "termin još nije objavljen";
-  return new Intl.DateTimeFormat("hr-HR", {
-    weekday: "long",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: timeZone ?? "Europe/Zagreb",
-  }).format(d);
+  const s = new Date(startsAt);
+  if (Number.isNaN(s.getTime())) return "termin još nije objavljen";
+  const tz = timeZone ?? "Europe/Zagreb";
+  const e = endsAt ? new Date(endsAt) : null;
+  const dio = (d: Date, o: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat("hr-HR", { ...o, timeZone: tz }).format(d);
+
+  if (dio(s, { hour: "2-digit", minute: "2-digit", hour12: false }) === "00:00") {
+    if (e && dio(s, { dateStyle: "short" }) !== dio(e, { dateStyle: "short" })) {
+      const doDatum = dio(e, { day: "numeric", month: "long", year: "numeric" });
+      const istiMjesec = dio(s, { month: "long", year: "numeric" }) === dio(e, { month: "long", year: "numeric" });
+      return istiMjesec
+        ? `${dio(s, { day: "numeric" })} – ${doDatum}`
+        : `${dio(s, { day: "numeric", month: "long" })} – ${doDatum}`;
+    }
+    return dio(s, { day: "numeric", month: "long", year: "numeric" });
+  }
+  return dio(s, {
+    weekday: "long", day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
 }
 
 export const eur = (cents: number): string =>
@@ -86,7 +106,7 @@ export interface TicketMailData {
 }
 
 export function ticketMail(d: TicketMailData): { subject: string; html: string; text: string } {
-  const when = formatWhenHr(d.event.starts_at, d.event.timezone);
+  const when = formatWhenHr(d.event.starts_at, d.event.timezone, d.event.ends_at ?? null);
   const place = [d.event.venue_name, d.event.venue_city].filter(Boolean).join(", ");
   const rows = d.tickets
     .map(

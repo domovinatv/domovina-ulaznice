@@ -133,6 +133,52 @@ export function datumHr(iso: string | null, timeZone = "Europe/Zagreb"): string 
   }).format(d);
 }
 
+/**
+ * Termin događaja za prikaz.
+ *
+ * Konvencija: organizatori objave datum puno prije satnice. Ako je vrijeme
+ * početka točno 00:00 u vremenskoj zoni događaja, tretiramo to kao "satnica
+ * još nije objavljena" i prikazujemo samo datum — umjesto da izmišljamo
+ * "u 00:00". Višednevni događaj se prikazuje kao raspon.
+ */
+export function terminHr(
+  startsAt: string | null,
+  endsAt: string | null,
+  timeZone = "Europe/Zagreb",
+): string {
+  if (!startsAt) return "termin još nije objavljen";
+  const s = new Date(startsAt);
+  if (Number.isNaN(s.getTime())) return "termin još nije objavljen";
+  const e = endsAt ? new Date(endsAt) : null;
+
+  const dio = (d: Date, opts: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat("hr-HR", { ...opts, timeZone }).format(d);
+
+  const bezSatnice = dio(s, { hour: "2-digit", minute: "2-digit", hour12: false }) === "00:00";
+  const istiDan = e ? dio(s, { dateStyle: "short" }) === dio(e, { dateStyle: "short" }) : true;
+
+  if (bezSatnice) {
+    const datum = dio(s, { day: "numeric", month: "long", year: "numeric" });
+    if (e && !istiDan) {
+      const doDatum = dio(e, { day: "numeric", month: "long", year: "numeric" });
+      // isti mjesec → "12. – 14. veljače 2027."; različit → pun oba datuma
+      const istiMjesec = dio(s, { month: "long", year: "numeric" }) === dio(e, { month: "long", year: "numeric" });
+      return istiMjesec
+        ? `${dio(s, { day: "numeric" })} – ${doDatum}`
+        : `${dio(s, { day: "numeric", month: "long" })} – ${doDatum}`;
+    }
+    return datum;
+  }
+
+  const pocetak = dio(s, {
+    weekday: "long", day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+  if (e && istiDan) return `${pocetak} – ${dio(e, { hour: "2-digit", minute: "2-digit" })}`;
+  if (e) return `${pocetak} – ${dio(e, { day: "2-digit", month: "2-digit", year: "numeric" })}`;
+  return pocetak;
+}
+
 /** Poruke grešaka na hrvatskom — kod s backenda je strojni. */
 export const PORUKE: Record<string, string> = {
   event_not_found: "Događaj nije pronađen.",

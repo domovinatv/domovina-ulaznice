@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { datumHr, dohvatiDogadjaj, eur, poruka, type EventView, type TierView } from "../lib/api";
+import { dohvatiDogadjaj, eur, poruka, terminHr, type EventView, type TierView } from "../lib/api";
 
 /** Zašto je tier vidljiv ali ne kupiv — kupac mora znati razlog. */
 function oznakaTiera(t: TierView) {
@@ -45,7 +45,7 @@ export default function Dogadjaj() {
       {d?.cover_image_url && <img className="hero" src={d.cover_image_url} alt="" width={720} height={405} />}
 
       <h1>{ev.title}</h1>
-      <p className="meta">{datumHr(d?.starts_at ?? null, d?.timezone)}</p>
+      <p className="meta">{terminHr(d?.starts_at ?? null, d?.ends_at ?? null, d?.timezone)}</p>
       <p className="meta">{[d?.venue_name, d?.venue_address, d?.venue_city].filter(Boolean).join(", ")}</p>
       {d?.organizer_name && <p className="meta">Organizator: {d.organizer_name}</p>}
 

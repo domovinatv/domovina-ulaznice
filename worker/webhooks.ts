@@ -365,6 +365,7 @@ export async function eventInfoForOrder(env: Env, orderId: string): Promise<Even
       title: ev.title,
       slug: ev.slug,
       starts_at: ev.event?.starts_at ?? null,
+      ends_at: ev.event?.ends_at ?? null,
       timezone: ev.event?.timezone ?? "Europe/Zagreb",
       venue_name: ev.event?.venue_name ?? null,
       venue_city: ev.event?.venue_city ?? null,

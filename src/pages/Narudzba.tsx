@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { datumHr, dohvatiNarudzbu, eur, poruka, posaljiPonovno, type OrderView } from "../lib/api";
+import { datumHr, dohvatiNarudzbu, eur, poruka, posaljiPonovno, terminHr, type OrderView } from "../lib/api";
 
 /**
  * "Moje ulaznice" — order_id iz e-maila je bearer capability (128-bit random).
@@ -85,7 +85,7 @@ export default function Narudzba() {
     <main className="omot">
       <h1>{order.event?.title ?? "Narudžba"}</h1>
       {order.event?.starts_at && (
-        <p className="meta">{datumHr(order.event.starts_at, order.event.timezone)}</p>
+        <p className="meta">{terminHr(order.event.starts_at, order.event.ends_at ?? null, order.event.timezone)}</p>
       )}
       <p className="meta">
         {[order.event?.venue_name, order.event?.venue_city].filter(Boolean).join(", ")}

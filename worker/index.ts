@@ -71,16 +71,28 @@ function publicEvent(ev: api.FeedEvent, rail: { connected: boolean; charges_enab
 
 // ------------------------------------------------------------------- rute
 
-app.get("/api/zdravlje", (c) =>
-  c.json({
-    ok: true,
+app.get("/api/zdravlje", (c) => {
+  // dev override (STRIPE_API_BASE / RESEND_API_BASE) smije postojati samo
+  // lokalno. Ako se provuče u produkciju, pozivi prema Stripeu i Resendu
+  // pucaju (guard prihvaća samo localhost) — a to se mora VIDJETI odmah,
+  // ne tek kad prva narudžba padne.
+  const devOverride = !!(c.env.STRIPE_API_BASE || c.env.RESEND_API_BASE);
+  const prod = /^https:\/\//.test(c.env.PUBLIC_BASE_URL ?? "") &&
+    !/localhost|127\.0\.0\.1|\.workers\.dev/.test(c.env.PUBLIC_BASE_URL ?? "");
+  if (devOverride && prod) {
+    console.error("[zdravlje] ⚠️ STRIPE_API_BASE/RESEND_API_BASE postavljeni na produkcijskoj domeni");
+  }
+  return c.json({
+    ok: !(devOverride && prod),
     api: !!c.env.DOMOVINA_API_URL,
     stripe: !!c.env.STRIPE_SECRET_KEY,
     webhook: !!c.env.STRIPE_WEBHOOK_SECRET,
     hmac: !!c.env.EVENTS_STRIPE_CONFIRM_SECRET,
     mail: !!c.env.RESEND_API_KEY,
-  }),
-);
+    dev_override: devOverride,
+    ...(devOverride && prod ? { upozorenje: "dev_override_na_produkciji" } : {}),
+  });
+});
 
 app.get("/api/dogadjaji", async (c) => {
   const { events } = await api.feed(c.env, c.req.query("grad") ? `?grad=${encodeURIComponent(c.req.query("grad")!)}` : "");
@@ -280,6 +292,7 @@ app.post("/api/ulaznice/:order_id/ponovna-dostava", async (c) => {
       title: ev?.title ?? "Događaj",
       slug: ev?.slug ?? "",
       starts_at: ev?.event?.starts_at ?? null,
+      ends_at: ev?.event?.ends_at ?? null,
       timezone: ev?.event?.timezone ?? "Europe/Zagreb",
       venue_name: ev?.event?.venue_name ?? null,
       venue_city: ev?.event?.venue_city ?? null,

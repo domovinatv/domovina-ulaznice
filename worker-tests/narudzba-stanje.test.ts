@@ -185,3 +185,22 @@ test("neočekivan mrežni poziv ruši test", async () => {
   const payload = checkoutCompleted({ orderId: ORDER });
   assert.ok(stripeSignature(payload).startsWith("t="));
 });
+
+test("termin: datum bez satnice se ne prikazuje kao „u 00:00”", async () => {
+  const { formatWhenHr } = await import("../worker/mail.ts");
+  // organizator objavio datume, ne i satnicu (00:00 u zoni događaja)
+  assert.equal(
+    formatWhenHr("2027-02-12T00:00:00+01:00", "Europe/Zagreb", "2027-02-14T23:59:00+01:00"),
+    "12. – 14. veljače 2027.",
+  );
+  // jednodnevni bez satnice
+  assert.equal(formatWhenHr("2027-04-16T00:00:00+02:00", "Europe/Zagreb", null), "16. travnja 2027.");
+  // raspon preko mjeseca
+  assert.equal(
+    formatWhenHr("2027-01-30T00:00:00+01:00", "Europe/Zagreb", "2027-02-02T23:59:00+01:00"),
+    "30. siječnja – 2. veljače 2027.",
+  );
+  // satnica objavljena → puni format s vremenom
+  assert.match(formatWhenHr("2027-04-16T09:00:00+02:00", "Europe/Zagreb", null), /09:00/);
+  assert.equal(formatWhenHr(null, "Europe/Zagreb"), "termin još nije objavljen");
+});

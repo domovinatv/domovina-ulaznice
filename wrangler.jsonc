@@ -19,12 +19,17 @@
     {
       "binding": "DB",
       "database_name": "domovina-ulaznice",
-      "database_id": "TODO-nakon-`wrangler d1 create domovina-ulaznice`"
+      "database_id": "2c01251e-133a-42db-9d1e-70cfe47db223"
     }
   ],
   "kv_namespaces": [
     // efemerni brojači (rate limit). Ništa domensko.
-    { "binding": "RL", "id": "TODO-nakon-`wrangler kv namespace create RL`" }
+    { "binding": "RL", "id": "e138b49a3eb14b56b1bbb8f57cde1c66" }
+  ],
+  // Custom domena — wrangler sam kreira DNS zapis i TLS ako je zona
+  // domovina.ai na istom Cloudflare računu (D.O.M.).
+  "routes": [
+    { "pattern": "ulaznice.domovina.ai", "custom_domain": true }
   ],
   "triggers": {
     // rekoncilijacija: nesparene uplate, propušteni webhookovi, istekli holdovi

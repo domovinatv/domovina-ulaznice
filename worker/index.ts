@@ -22,6 +22,53 @@ const MAX_QTY = 10;
 
 const app = new Hono<{ Bindings: Env }>();
 
+// ------------------------------------------------------------------ najava
+
+/**
+ * Stranica najave za okruženje koje još ne prodaje (NAJAVA="1").
+ *
+ * Namjerno je bez ijedne tvrdnje o datumu, cijeni ili organizatoru — nema ih
+ * tko potvrditi. Bez ovoga bi javna domena servirala SPA koja izgleda kao
+ * radna trgovina, a iza nje nema ni baze ni Stripe ključeva.
+ */
+const NAJAVA_HTML = `<!doctype html>
+<html lang="hr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ulaznice — Domovina</title>
+<meta name="robots" content="noindex">
+<meta name="description" content="Prodaja ulaznica bez posrednika — uskoro.">
+<style>
+  :root { color-scheme: light dark; }
+  body { margin:0; min-height:100vh; display:grid; place-items:center;
+         font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;
+         background:#fbfbfa; color:#1a1a19; padding:24px; }
+  @media (prefers-color-scheme: dark) { body { background:#141413; color:#f0f0ef; } }
+  main { max-width:34rem; text-align:center; }
+  h1 { font-size:1.6rem; margin:0 0 .6rem; letter-spacing:-.01em; }
+  p { margin:.6rem 0; }
+  .mutno { opacity:.65; font-size:.92rem; }
+</style></head>
+<body><main>
+  <h1>Ulaznice bez posrednika</h1>
+  <p>Organizator prodaje sa svoje stranice, novac ide izravno njemu.
+     Bez naknade posrednika na ulaznicu.</p>
+  <p class="mutno">Prodaja još nije otvorena. Ova stranica je najava.</p>
+</main></body></html>`;
+
+/**
+ * U okruženju najave ništa osim najave ne postoji — API i webhook vraćaju 404,
+ * ne 503. Razlog: 503 poziva na ponovni pokušaj i daje do znanja da ruta
+ * postoji; ovdje je istina da u ovom okruženju te rute nema.
+ */
+app.use("*", async (c, next) => {
+  if (c.env.NAJAVA !== "1") return next();
+  const p = new URL(c.req.url).pathname;
+  if (p.startsWith("/api/") || p.startsWith("/webhook/")) {
+    return c.json({ error: "not_found" }, 404);
+  }
+  return c.html(NAJAVA_HTML, 200, { "cache-control": "public, max-age=300" });
+});
+
 // ------------------------------------------------------------------ pomoćnici
 
 const fail = (code: string, status = 400, extra: Record<string, unknown> = {}) =>
@@ -348,6 +395,10 @@ function maskEmail(email: string | null): string | null {
 export default {
   fetch: app.fetch,
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    // Okruženje najave nema ni D1 ni Stripe ključeve — rekoncilijacija bi samo
+    // rušila cron. Produkcija danas i nema trigger, ali guard stoji da dodavanje
+    // triggera ne postane tiha greška.
+    if (env.NAJAVA === "1") return;
     ctx.waitUntil(
       reconcile(env).catch((e) => {
         console.error(`[cron] rekoncilijacija: ${String(e)}`);

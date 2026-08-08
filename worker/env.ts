@@ -11,6 +11,12 @@ export interface Env {
   ASSETS: { fetch(req: Request): Promise<Response> };
 
   // vars (wrangler.jsonc)
+  //
+  // NAJAVA="1" → okruženje NIJE prodajno: Worker vraća statičnu najavu na sve
+  // rute, a /api/* i /webhook/* daju 404. Koristi produkcija dok prodaja ne
+  // krene, da javna domena ne izgleda kao da radi. Namjerno se provjerava
+  // točna vrijednost "1" — svaka druga (i odsutnost) znači normalan rad.
+  NAJAVA?: string;
   PUBLIC_BASE_URL: string;
   DOMOVINA_API_URL: string;
   EMAIL_FROM?: string;

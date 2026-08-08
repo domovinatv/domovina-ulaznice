@@ -6,49 +6,88 @@
   // (shema pinka_finance). D1 drži samo operativni trag: webhook log, poslane
   // e-mailove i brand postavke prodajne stranice. Ulaznica, narudžbi i
   // inventoryja u D1 NEMA i ne smije biti (docs/02-arhitektura.md §1).
+  //
+  // ── DVA OKRUŽENJA ─────────────────────────────────────────────────────────
+  //
+  //   vrh datoteke  → PRODUKCIJA   ulaznice.domovina.ai
+  //   env.staging   → STAGING      ulaznice-staging.domovina.ai
+  //
+  //   wrangler deploy                  → produkcija (samo najava, v. dolje)
+  //   wrangler deploy --env staging    → staging (puna aplikacija)
+  //
+  // Produkcija danas NIJE prodajna: nema ASSETS-a, D1, KV-a ni crona, a var
+  // NAJAVA=1 tjera Worker da na svaki zahtjev vrati statičnu najavu i da
+  // /api/* i /webhook/* vrate 404. Razlog: domena je javna i ne smije
+  // izgledati kao da prodaja radi dok ne radi. Kad prodaja krene, makne se
+  // NAJAVA i vrate se ASSETS/D1/KV/triggers (vrijednosti su u env.staging).
+  //
+  // Oba okruženja gađaju ISTU jezgru (api.domovina.ai) — to je odluka vlasnika,
+  // ne propust: jezgra je backend-only i jednog dana drži i stvarno plaćene i
+  // staging ulaznice jedne pored drugih. Staging Worker je "samo frontend".
+  // Posljedica koju treba poštovati: narudžbe iz staginga stvaraju stvarne
+  // retke u pinka_finance, pa test organizator ima fiksne, prepoznatljive
+  // UUID-eve da se može čisto obrisati (v. seeds/).
   "name": "domovina-ulaznice",
   "main": "worker/index.ts",
   "compatibility_date": "2024-11-01",
   "compatibility_flags": ["nodejs_compat"],
-  "assets": {
-    "directory": "./dist",
-    "binding": "ASSETS",
-    "not_found_handling": "single-page-application"
-  },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "domovina-ulaznice",
-      "database_id": "2c01251e-133a-42db-9d1e-70cfe47db223"
-    }
-  ],
-  "kv_namespaces": [
-    // efemerni brojači (rate limit). Ništa domensko.
-    { "binding": "RL", "id": "e138b49a3eb14b56b1bbb8f57cde1c66" }
-  ],
-  // Custom domena — wrangler sam kreira DNS zapis i TLS ako je zona
-  // domovina.ai na istom Cloudflare računu (D.O.M.).
+
+  // ── PRODUKCIJA: samo najava ────────────────────────────────────────────────
   "routes": [
     { "pattern": "ulaznice.domovina.ai", "custom_domain": true }
   ],
-  // Bez ovoga `routes` gasi *.workers.dev poddomenu; držimo je za smoke test
-  // prije nego custom domena propagira.
-  "workers_dev": true,
-  "triggers": {
-    // rekoncilijacija: nesparene uplate, propušteni webhookovi, istekli holdovi
-    "crons": ["*/15 * * * *"]
-  },
+  "workers_dev": false,
   "vars": {
+    "NAJAVA": "1",
     "PUBLIC_BASE_URL": "https://ulaznice.domovina.ai",
-    "DOMOVINA_API_URL": "https://api.domovina.ai",
-    "EMAIL_FROM": "Domovina ulaznice <ulaznice@domovina.ai>",
-    "EMAIL_REPLY_TO": "podrska@domovina.ai",
-    // rate limit "koliko/sekundi" (worker/ratelimit.ts); prazno = zadano
-    "RL_ORDER_IP": "10/600",
-    "RL_WEBHOOK_IP": "300/60"
+    "DOMOVINA_API_URL": "https://api.domovina.ai"
+  },
+
+  "env": {
+    // ── STAGING: puna aplikacija ────────────────────────────────────────────
+    // Bindingi se u wrangleru NE nasljeđuju iz vrha — sve se navodi ponovno.
+    "staging": {
+      "name": "domovina-ulaznice-staging",
+      "routes": [
+        { "pattern": "ulaznice-staging.domovina.ai", "custom_domain": true }
+      ],
+      "workers_dev": true,
+      "assets": {
+        "directory": "./dist",
+        "binding": "ASSETS",
+        "not_found_handling": "single-page-application"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "domovina-ulaznice-staging",
+          "database_id": "f9c7a381-d75e-4a74-9ddc-62482313d875"
+        }
+      ],
+      "kv_namespaces": [
+        // efemerni brojači (rate limit). Ništa domensko.
+        { "binding": "RL", "id": "2ea2e4ca9048414faa78a9be870722aa" }
+      ],
+      "triggers": {
+        // rekoncilijacija: nesparene uplate, propušteni webhookovi, istekli holdovi
+        "crons": ["*/15 * * * *"]
+      },
+      "vars": {
+        "PUBLIC_BASE_URL": "https://ulaznice-staging.domovina.ai",
+        "DOMOVINA_API_URL": "https://api.domovina.ai",
+        "EMAIL_FROM": "Domovina ulaznice (staging) <ulaznice@domovina.ai>",
+        "EMAIL_REPLY_TO": "podrska@domovina.ai",
+        // rate limit "koliko/sekundi" (worker/ratelimit.ts); prazno = zadano
+        "RL_ORDER_IP": "10/600",
+        "RL_WEBHOOK_IP": "300/60"
+      }
+    }
   }
-  // Tajne (wrangler secret put):
-  //   STRIPE_SECRET_KEY             sk_test_… / sk_live_…
+
+  // Tajne su PO OKRUŽENJU — staging ključ ne može završiti u produkciji:
+  //   wrangler secret put <IME> --env staging
+  //
+  //   STRIPE_SECRET_KEY             sk_test_… (staging = Stripe sandbox)
   //   STRIPE_WEBHOOK_SECRET         whsec_… (Connect endpoint!)
   //   EVENTS_STRIPE_CONFIRM_SECRET  ISTA vrijednost kao u domovina-api edge runtimeu
   //   DOMOVINA_API_SERVICE_KEY      service_role ključ (nikad u SPA)

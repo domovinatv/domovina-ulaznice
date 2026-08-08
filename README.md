@@ -6,9 +6,18 @@ Organizator prodaje ulaznice s vlastite stranice, novac ide **izravno na njegov
 Stripe račun** (Connect, `application_fee_amount = 0`), ulaznica je QR koji se
 skenira na ulazu. Platforma nikad ne drži novac i ne uzima proviziju s ulaznice.
 
-> Status: **U1 ✅ · U2 ✅ (kod gotov, čeka Stripe ključeve i deploy)**.
+> Status: **U1 ✅ (živ u produkciji) · U2 ✅ (deployan na staging)**.
 > U1 je u `domovina-api` (Stripe rail u ticketing jezgri), U2 je ovaj Worker + SPA.
-> Što još treba vlasnik: [U2 Zapisnik](docs/handoffs/u2-javna-prodaja-web.md#zapisnik-izvršenja).
+>
+> | Okruženje | URL | Stanje |
+> | --- | --- | --- |
+> | staging | `ulaznice-staging.domovina.ai` | puna aplikacija, Stripe sandbox |
+> | produkcija | `ulaznice.domovina.ai` | **samo najava** — prodaja nije otvorena |
+>
+> Preostalo za prvu test kupnju: Express onboarding + `STRIPE_SECRET_KEY` i
+> `STRIPE_WEBHOOK_SECRET` (`wrangler secret put … --env staging`).
+> Stanje deploya, zamke i otvorena pitanja:
+> [2026-08-08](docs/2026-08-08-deploy-okruzenja-i-stripe.md).
 > Datum plana: 2026-08-03.
 
 ## Kako pokrenuti

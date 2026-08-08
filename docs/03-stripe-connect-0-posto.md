@@ -160,3 +160,17 @@ Preuzeti obrazac iz `rodjendaonice/worker/reconcile.ts`:
    "0 € naknade" u marketingu. Preporuka: ne raditi.
 4. **Payout raspored** — Stripe zadano isplaćuje po rasporedu connected accounta;
    organizatoru to treba objasniti u onboardingu (nije instant kao EURe rail).
+5. 🔴 **Express vs Standard — odluka iz ovog dokumenta je pod upitnikom.**
+   Uz Express **platforma** nosi odgovornost za prijevaru i sporove i kod direct
+   chargea, plus Express ima dodatni trošak. Na proizvodu s 0 % naknade to znači
+   nula prihoda uz sav chargeback rizik. Kod Standarda odgovornost pada na
+   **connected account** (organizatora), koji i jest prodavatelj — što se poklapa
+   s [04](04-porezni-i-pravni-okvir.md). Stripe usto tipove računa smatra
+   zastarjelima za nove platforme i upućuje na Accounts v2 / controller
+   properties. Argumentacija i tablica:
+   [2026-08-08 §7.1](2026-08-08-deploy-okruzenja-i-stripe.md#71-express-vs-standard--ovo-je-najveće).
+   **Odlučiti prije prvog pravog organizatora.**
+6. **Pravni subjekt platforme** — sandbox je pod `italk.hr`. Platforma je ugovorna
+   strana prema Stripeu i njezin branding organizator vidi u onboardingu.
+   Connected accounti se ne sele bez ponovnog onboardinga, pa odluka mora doći
+   prije prvog onboardinga, ne poslije.

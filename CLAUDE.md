@@ -9,9 +9,14 @@ Organizator prodaje s vlastite stranice, novac ide izravno na njegov Stripe rač
 (Connect **direct charge**, `application_fee_amount` se ne šalje), ulaznica je QR
 koji se skenira na ulazu.
 
-Status: **U1 ✅ (u `domovina-api`) · U2 ✅ (ovaj repo: `worker/` + `src/`)**.
-Oba čekaju vlasnika za deploy (SSH, Stripe TEST ključevi, Cloudflare projekt) —
-popis je u Zapisnicima izvršenja u `docs/handoffs/`.
+Status: **U1 ✅ živ na `api.domovina.ai` · U2 ✅ deployan na staging**.
+
+- `ulaznice-staging.domovina.ai` — puna aplikacija, Stripe **sandbox**
+- `ulaznice.domovina.ai` — **samo najava** (`NAJAVA=1`, bez D1/KV/ASSETS/crona)
+
+Deploy ide s `npm run deploy` (= staging); produkcija je `npm run deploy:prod`.
+Tajne su po okruženju: `wrangler secret put … --env staging`.
+Stanje, zamke i otvorena pitanja: `docs/2026-08-08-deploy-okruzenja-i-stripe.md`.
 
 ## Prvo pročitaj
 

@@ -31,6 +31,9 @@
   "routes": [
     { "pattern": "ulaznice.domovina.ai", "custom_domain": true }
   ],
+  // Bez ovoga `routes` gasi *.workers.dev poddomenu; držimo je za smoke test
+  // prije nego custom domena propagira.
+  "workers_dev": true,
   "triggers": {
     // rekoncilijacija: nesparene uplate, propušteni webhookovi, istekli holdovi
     "crons": ["*/15 * * * *"]

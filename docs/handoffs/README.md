@@ -25,13 +25,19 @@ Zapisnik izvršenja      ★ agent ga popunjava na kraju — ugovor prema idućo
 | --- | ------------------------------------------------------------ | --------------------------------- | ------- | ------ |
 | U1  | [Stripe rail u backendu](u1-stripe-rail-backend.md)         | `domovina-api`                    | —       | ✅ (lokalno verificirano; prod deploy čeka vlasnika) |
 | U2  | [Javna prodaja end-to-end](u2-javna-prodaja-web.md)         | ovaj repo                         | U1      | ✅ (kod + 50 testova; čeka Stripe ključeve i deploy) |
-| U3  | [Organizator self-service](u3-organizator-dashboard.md)     | ovaj repo (+ `domovina-api`)      | U2      | ⬜     |
-| U4  | [Check-in PWA](u4-checkin-pwa.md)                           | ovaj repo                         | U2      | ⬜     |
-| U5  | [Računi / fiskalizacija](u5-racuni-fiskalizacija.md)        | ovaj repo (+ `domovina-fiskal`)   | U3, U4  | ⬜     |
+| U3  | [Organizator self-service](u3-organizator-dashboard.md)     | ovaj repo (+ `domovina-api`)      | U2      | 🟡 (pregled prodaje + CSV izvoz rade; editor i onboarding ne) |
+| U4  | [Check-in PWA](u4-checkin-pwa.md)                           | ovaj repo                         | U2      | 🟡 (skener radi; iOS fallback i ručni serial ostali) |
+| U5  | [Računi / fiskalizacija](u5-racuni-fiskalizacija.md)        | ovaj repo (+ `domovina-fiskal`)   | U3, U4  | 🟡 (`organizator` + `fira` rade; `domovina_fiskal` i storno ne) |
 | U6  | [airKUNA rail](u6-airkuna-rail.md)                          | ovaj repo + `safe-wallet-monorepo`| U2      | ⬜     |
+| U7  | [Produkcijski preduvjeti](u7-produkcijski-preduvjeti.md)    | ovaj repo (+ `domovina-api`)      | U2      | ⬜     |
 
 ## Nalazi iz izvršenja
 
+- [2026-09-03 — Plan do produkcije](../2026-09-03-plan-do-produkcije.md) — što
+  još stoji između koda i prve naplaćene ulaznice, provjereno na živim sustavima.
+- [2026-09-03 — Implementacija P0/P1](../2026-09-03-implementacija-p0-p1.md) —
+  što je napravljeno, što je namjerno ostavljeno, i popis `REVIEW(fable)` mjesta.
+- [2026-08-08 — Deploy, okruženja i Stripe](../2026-08-08-deploy-okruzenja-i-stripe.md)
 - [2026-08-04 — Lokalna verifikacija U1+U2](../2026-08-04-lokalna-verifikacija-i-nalazi.md)
   — odbačene alternative, zamke, mjerenja, otvorene stavke, redoslijed deploya.
 - [Izvještaj sa snimkama (PDF)](../izvjestaji/2026-08-04-lokalni-test-u1-u2.pdf)

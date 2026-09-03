@@ -1,11 +1,20 @@
-// D1 shim nad node:sqlite + shema iz PRAVE migracije (migrations/0001_init.sql).
+// D1 shim nad node:sqlite + shema iz PRAVIH migracija (migrations/*.sql).
 // Obrazac: rodjendaonice/apps/marketplace/worker-tests/harness/d1.ts.
+//
+// Migracije se čitaju s diska i puštaju abecedno (0001, 0002, …). Namjerno se
+// NE popisuju ručno: nova migracija koju testovi ne poznaju je najtiši mogući
+// način da produkcija ima tablicu koju test nema (ili obrnuto).
 import { DatabaseSync } from "node:sqlite";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const here = (rel: string) => fileURLToPath(new URL(rel, import.meta.url));
-const SCHEMA = readFileSync(here("../../migrations/0001_init.sql"), "utf8");
+const MIGRACIJE = here("../../migrations/");
+const SCHEMA = readdirSync(MIGRACIJE)
+  .filter((f) => f.endsWith(".sql"))
+  .sort()
+  .map((f) => readFileSync(`${MIGRACIJE}${f}`, "utf8"))
+  .join("\n");
 
 // D1 ne prima `undefined` i booleane pretvara u 0/1; node:sqlite je stroži.
 const norm = (b: unknown[]) =>

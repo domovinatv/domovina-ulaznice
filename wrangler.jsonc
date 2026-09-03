@@ -75,8 +75,19 @@
       "vars": {
         "PUBLIC_BASE_URL": "https://ulaznice-staging.domovina.ai",
         "DOMOVINA_API_URL": "https://api.domovina.ai",
+        // Anon ključ GoTruea. NIJE tajna: po dizajnu putuje u svakom browser
+        // bundleu Supabase aplikacije, i isti ključ stoji u
+        // domovina-fiskal/backend/wrangler.toml uz istu napomenu. Bez njega
+        // prijava organizatora i skener ulaza ne rade. Tajna je i ostaje samo
+        // service ključ (wrangler secret) i HS256 JWT_SECRET (nikad ovdje).
+        "DOMOVINA_API_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3OTExMTcxMywiZXhwIjo0OTMyNzExNzEzLCJyb2xlIjoiYW5vbiJ9.Q4Ef7xMc2dmjMyfJebPDyqNirnARZzMxTWe7i0dASPI",
         "EMAIL_FROM": "Domovina ulaznice (staging) <ulaznice@domovina.ai>",
         "EMAIL_REPLY_TO": "podrska@domovina.ai",
+        // Kamo idu alarmi rekoncilijacije i zaostale dostave. Bez ove adrese
+        // alarm završi u console.error koji nitko ne gleda.
+        "ALARM_EMAIL": "podrska@domovina.ai",
+        // koliko minuta isti alarm šuti nakon slanja (cron ide svakih 15 min)
+        "ALARM_PRIGUSI_MIN": "180",
         // rate limit "koliko/sekundi" (worker/ratelimit.ts); prazno = zadano
         "RL_ORDER_IP": "10/600",
         "RL_WEBHOOK_IP": "300/60"
@@ -92,4 +103,6 @@
   //   EVENTS_STRIPE_CONFIRM_SECRET  ISTA vrijednost kao u domovina-api edge runtimeu
   //   DOMOVINA_API_SERVICE_KEY      service_role ključ (nikad u SPA)
   //   RESEND_API_KEY                bez njega mail ide u log, ne šalje se
+  //   FIRA_API_KEY                  ključ organizatora; bez njega račun ostaje
+  //                                 obveza organizatora (provider 'organizator')
 }

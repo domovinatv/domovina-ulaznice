@@ -13,6 +13,7 @@ import { D1Shim, freshDb } from "./d1.ts";
 export const HMAC_SECRET = "test-hmac-secret";
 export const WEBHOOK_SECRET = "whsec_test";
 export const SERVICE_KEY = "test-service-key";
+export const ANON_KEY = "test-anon-key";
 export const API_URL = "https://api.test";
 export const BASE_URL = "https://ulaznice.test";
 
@@ -51,6 +52,21 @@ export interface ApiState {
   buyerEmail: string | null;
   tickets: Array<Record<string, unknown>>;
   deliverTokens: boolean;
+  /** Ishod `rotate_ticket_tokens` (mijenja se po testu). */
+  rotateStatus: "rotated" | "nothing_to_rotate" | "rate_limited" | "order_not_paid";
+  rotacije: number;
+  /** GoTrue: prihvaća li prijavu i s kojim tokenom. */
+  prijavaOk: boolean;
+  jwt: string;
+  /** Ishod `events-checkin`. */
+  checkin: Record<string, unknown>;
+  checkinStatus: number;
+  organizerOverview: Record<string, unknown>;
+  /** `organizer_payment_rails.invoice_provider` — tko izdaje račun kupcu. */
+  invoiceProvider: string;
+  /** Odgovor FIRA API-ja. */
+  firaOk: boolean;
+  firaPozivi: Array<{ body: string; headers: Record<string, string> }>;
   refundStatus: string;
   emailFails: boolean;
   stripeFails: boolean;
@@ -73,6 +89,16 @@ export function testEnv(overrides: Partial<Record<string, unknown>> = {}): TestC
     buyerEmail: "kupac@example.com",
     tickets: [],
     deliverTokens: true,
+    rotateStatus: "rotated",
+    rotacije: 0,
+    prijavaOk: true,
+    jwt: "jwt-organizatora",
+    checkin: { status: "checked_in", serial: "SUS-000004", holder_name: "Ana Anić", tier_title: "Redovna", checked_in_count: 1 },
+    checkinStatus: 200,
+    organizerOverview: { accounts: [{ id: "acc-1", name: "Test udruga", allowlisted: true, has_record: true }], events: [] },
+    invoiceProvider: "organizator",
+    firaOk: true,
+    firaPozivi: [],
     refundStatus: "refunded",
     emailFails: false,
     stripeFails: false,
@@ -93,6 +119,7 @@ export function testEnv(overrides: Partial<Record<string, unknown>> = {}): TestC
     STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
     EVENTS_STRIPE_CONFIRM_SECRET: HMAC_SECRET,
     DOMOVINA_API_SERVICE_KEY: SERVICE_KEY,
+    DOMOVINA_API_ANON_KEY: ANON_KEY,
     RESEND_API_KEY: "re_test",
     ...overrides,
   } as unknown as Env;
@@ -254,7 +281,46 @@ function installFetchStub(state: ApiState) {
       });
     }
 
+    // ---- GoTrue (prijava organizatora / skenera)
+    if (url.includes("/auth/v1/token")) {
+      if (!state.prijavaOk) return json({ error: "invalid_grant" }, 400);
+      return json({
+        access_token: state.jwt,
+        expires_in: 3600,
+        refresh_token: "refresh-koji-ne-smije-izaci",
+        user: { id: "u1", email: "org@test.hr" },
+      });
+    }
+
+    // ---- domovina-api: events-checkin (traži Authorization, za razliku od ostalih)
+    if (url.includes("/functions/v1/events-checkin")) {
+      if (!headers.authorization?.startsWith("Bearer ")) {
+        throw new Error("events-checkin pozvan BEZ Authorization headera");
+      }
+      if (headers.apikey === SERVICE_KEY) {
+        throw new Error("events-checkin NE SMIJE dobiti service ključ kao apikey");
+      }
+      return json(state.checkin, state.checkinStatus);
+    }
+
     // ---- domovina-api: PostgREST
+    if (url.includes("/rest/v1/rpc/organizer_overview")) {
+      // mora ići U IME korisnika, nikad service ključem
+      if (headers.authorization !== `Bearer ${state.jwt}`) {
+        throw new Error("organizer_overview pozvan bez korisnikovog JWT-a");
+      }
+      return json(state.organizerOverview);
+    }
+    if (url.includes("/rest/v1/rpc/rotate_ticket_tokens")) {
+      state.rotacije += 1;
+      if (state.rotateStatus !== "rotated") return json({ status: state.rotateStatus });
+      return json({
+        status: "rotated",
+        order_id: JSON.parse(body || "{}").p_order_id,
+        rotated: state.tickets.length,
+        tickets: state.tickets.map((t) => ({ ...t, qr_token: "b".repeat(64) })),
+      });
+    }
     if (url.includes("/rest/v1/rpc/refund_ticket_order")) {
       return json({ status: state.refundStatus, order_id: JSON.parse(body || "{}").p_order_id, voided: 2 });
     }
@@ -266,6 +332,7 @@ function installFetchStub(state: ApiState) {
       return json([{
         stripe_account_id: state.connected ? ACCT : null,
         stripe_charges_enabled: state.chargesEnabled,
+        invoice_provider: state.invoiceProvider,
       }]);
     }
     if (url.includes("/rest/v1/contributions")) {
@@ -289,6 +356,8 @@ function installFetchStub(state: ApiState) {
       return json(state.tickets.map((t) => ({
         serial: t.serial,
         holder_name: t.holder_name ?? null,
+        // izvoz sudionika traži i e-mail; javna stranica narudžbe ga ne traži
+        holder_email: t.holder_email ?? null,
         state: t.state ?? "issued",
         checked_in_at: null,
       })));
@@ -314,6 +383,13 @@ function installFetchStub(state: ApiState) {
       if (url.includes("/v1/payment_intents/")) {
         return json({ id: "pi_test_1", object: "payment_intent", status: "succeeded", amount_received: 29800 });
       }
+    }
+
+    // ---- FIRA
+    if (url.includes("fira.finance") || url.includes("/api/v1/webshop/order/custom")) {
+      state.firaPozivi.push({ body, headers });
+      if (!state.firaOk) return json({ message: "neispravan ključ" }, 401);
+      return json({ id: 123456 });
     }
 
     // ---- Resend

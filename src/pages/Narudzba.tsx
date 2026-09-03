@@ -43,6 +43,7 @@ export default function Narudzba() {
   const [order, setOrder] = useState<OrderView | null>(null);
   const [greska, setGreska] = useState<string | null>(null);
   const [poruke, setPoruke] = useState<string | null>(null);
+  const [salje, setSalje] = useState(false);
   const pokusaji = useRef(0);
 
   const ucitaj = useCallback(
@@ -128,7 +129,7 @@ export default function Narudzba() {
             </div>
           ))}
           <p className="mutno">
-            QR kodovi su u e-mailu koji smo poslali. Iz sigurnosnih razloga izdaju se jednom i ne prikazuju se ovdje.
+            QR kodovi su u e-mailu koji smo poslali i ovdje se namjerno ne prikazuju.
           </p>
         </>
       )}
@@ -137,29 +138,41 @@ export default function Narudzba() {
         <div className="kartica">
           <strong>Niste dobili e-mail?</strong>
           <p className="mutno" style={{ marginTop: 4 }}>
-            Provjerite i mapu neželjene pošte. Ako poruke nema, možemo pokušati ponovno.
+            Provjerite i mapu neželjene pošte. Ako poruke nema, poslat ćemo ulaznice ponovno.
+          </p>
+          {/* Posljedica se kaže PRIJE klika, ne poslije: rotacija poništava
+              stari QR, a netko je taj QR možda već proslijedio prijatelju. */}
+          <p className="mutno">
+            Ako je prva poruka stigla, novi QR kodovi poništavaju stare —
+            proslijeđene ulaznice iz stare poruke prestaju vrijediti.
           </p>
           {poruke && <div className="obavijest">{poruke}</div>}
           <button
             className="gumb gumb--tanki"
+            disabled={salje}
             onClick={async () => {
               setPoruke(null);
+              setSalje(true);
               try {
                 const r = await posaljiPonovno(orderId);
                 setPoruke(
                   r.status === "poslano"
-                    ? `Poslano na ${r.recipient}.`
-                    : r.status === "vec_isporuceno"
-                      ? "Ulaznice su već isporučene u ranijoj poruci — QR kod se izdaje samo jednom. Ako je ne nalazite, javite se podršci."
+                    ? r.stari_qr_ponisten
+                      ? `Poslano na ${r.recipient}. Vrijede QR kodovi iz NOVE poruke — stari više ne rade.`
+                      : `Poslano na ${r.recipient}.`
+                    : r.status === "nema_vazecih_ulaznica"
+                      ? "Sve ulaznice iz ove narudžbe su već iskorištene ili poništene."
                       : "Slanje nije uspjelo. Pokušajte kasnije ili se javite podršci.",
                 );
                 void ucitaj();
               } catch (e) {
                 setPoruke(poruka((e as { code: string }).code));
+              } finally {
+                setSalje(false);
               }
             }}
           >
-            Pošalji ponovno
+            {salje ? "Šaljem…" : "Pošalji ponovno"}
           </button>
         </div>
       )}

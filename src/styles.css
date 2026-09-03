@@ -131,3 +131,51 @@ input:focus, select:focus { outline: 2px solid var(--zelena); outline-offset: 1p
 }
 
 .podnozje { text-align: center; color: var(--siva); font-size: 13px; margin-top: 32px; }
+
+/* ── skener ulaza i pregled organizatora ────────────────────────────────────
+   Rezultat skena mora se pročitati iz ruke, u buci, na suncu: veliki znak,
+   jaka boja, bez suptilnosti. */
+
+.skener__vrh {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.skener__video {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  max-height: 60vh;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #000;
+}
+
+.sken {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 14px;
+  border: 2px solid;
+}
+.sken--ok { background: #eafbea; border-color: #2f855a; color: var(--zelena-tamna); }
+.sken--lose { background: #fdecec; border-color: var(--crvena); color: #7f1d1d; }
+.sken__znak { font-size: 44px; line-height: 1; }
+.sken__tekst { font-size: 17px; line-height: 1.35; }
+.sken__tekst strong { display: block; font-size: 21px; }
+
+/* Tier kao gumb — odabir događaja u skeneru. */
+.tier--gumb {
+  width: 100%;
+  text-align: left;
+  background: var(--papir);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.tier--gumb:hover { border-color: var(--zelena); }

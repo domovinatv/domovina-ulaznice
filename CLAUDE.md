@@ -9,7 +9,10 @@ Organizator prodaje s vlastite stranice, novac ide izravno na njegov Stripe rač
 (Connect **direct charge**, `application_fee_amount` se ne šalje), ulaznica je QR
 koji se skenira na ulazu.
 
-Status: **U1 ✅ živ na `api.domovina.ai` · U2 ✅ deployan na staging**.
+Status: **U1 ✅ živ na `api.domovina.ai` · U2 ✅ deployan na staging · U3/U4/U5 🟡
+djelomično** (pregled prodaje, skener ulaza i FIRA račun rade; editor događaja,
+Connect onboarding i `domovina_fiskal` ne). Prodaja **još ne radi ni na
+stagingu** — nedostaju Stripe/Resend tajne i objavljen događaj u jezgri.
 
 - `ulaznice-staging.domovina.ai` — puna aplikacija, Stripe **sandbox**
 - `ulaznice.domovina.ai` — **samo najava** (`NAJAVA=1`, bez D1/KV/ASSETS/crona)
@@ -17,6 +20,8 @@ Status: **U1 ✅ živ na `api.domovina.ai` · U2 ✅ deployan na staging**.
 Deploy ide s `npm run deploy` (= staging); produkcija je `npm run deploy:prod`.
 Tajne su po okruženju: `wrangler secret put … --env staging`.
 Stanje, zamke i otvorena pitanja: `docs/2026-08-08-deploy-okruzenja-i-stripe.md`.
+Što još treba do produkcije: `docs/2026-09-03-plan-do-produkcije.md`
+(+ `docs/2026-09-03-implementacija-p0-p1.md` za popis `REVIEW(fable)` mjesta).
 
 ## Prvo pročitaj
 
@@ -41,7 +46,7 @@ Stanje, zamke i otvorena pitanja: `docs/2026-08-08-deploy-okruzenja-i-stripe.md`
 ## Stack
 
 - Worker + Hono + D1 (operativni podaci) + KV (rate limit) + React SPA → Cloudflare
-  - `npm test` (50 testova, node:test, **nikad na mrežu**), `npm run build`, `npm run api`
+  - `npm test` (89 testova, node:test, **nikad na mrežu**), `npm run build`, `npm run api`
 - Ticketing: `domovina-api` edge funkcije `events-*`
 - Računi: `InvoiceProvider` (organizator | fira | domovina_fiskal)
 

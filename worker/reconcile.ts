@@ -12,12 +12,14 @@ import type { Env } from "./env";
 import * as api from "./api";
 import { retrievePaymentIntent } from "./stripe";
 import { logMoney } from "./webhooks";
+import { alarm } from "./alarm";
 
 export interface ReconcileReport {
   checked: number;
   confirmed: number;
   refunded: number;
   pendingDeliveries: number;
+  failedInvoices: number;
   problems: string[];
 }
 
@@ -30,6 +32,7 @@ export async function reconcile(env: Env): Promise<ReconcileReport> {
     confirmed: 0,
     refunded: 0,
     pendingDeliveries: 0,
+    failedInvoices: 0,
     problems: [],
   };
 
@@ -114,6 +117,21 @@ export async function reconcile(env: Env): Promise<ReconcileReport> {
     }
   }
 
+  // ── 4. neizdani računi ────────────────────────────────────────────────────
+  // Pad providera ne poništava ulaznicu (racun.ts pravilo 2), ali
+  // ostavlja obvezu neispunjenom — a to nitko ne vidi iz same prodaje.
+  const racuni = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM invoices WHERE status IN ('neuspjeh','u_tijeku') " +
+      "AND created_at > datetime('now', ?)",
+  )
+    .bind(`-${LOOKBACK_HOURS} hours`)
+    .first<{ n: number }>()
+    .catch(() => null);
+  report.failedInvoices = Number(racuni?.n ?? 0);
+  if (report.failedInvoices > 0) {
+    report.problems.push(`${report.failedInvoices} narudžbi bez izdanog računa`);
+  }
+
   if (report.problems.length) {
     await logMoney(env, {
       orderId: null,
@@ -124,6 +142,12 @@ export async function reconcile(env: Env): Promise<ReconcileReport> {
       result: "error",
       detail: report.problems.slice(0, 10).join(" | ").slice(0, 900),
     });
+    // Log je trag za poslije; alarm je jedini način da netko sazna danas.
+    await alarm(env, {
+      kljuc: "reconcile.problemi",
+      naslov: `Rekoncilijacija: ${report.problems.length} problema`,
+      redci: report.problems.slice(0, 20),
+    }).catch((e) => console.error(`[cron] alarm: ${String(e)}`));
   }
   console.log(JSON.stringify({ evt: "reconcile", ...report, problems: report.problems.length }));
   return report;

@@ -24,6 +24,28 @@ export interface Env {
   RL_ORDER_IP?: string;
   RL_WEBHOOK_IP?: string;
 
+  /**
+   * Anon ključ GoTruea (`api.domovina.ai`). NIJE tajna — po dizajnu putuje u
+   * svakom browser bundleu Supabase aplikacije i isti ključ već stoji u
+   * `domovina-fiskal/backend/wrangler.toml` uz istu napomenu. Ovdje je var, ne
+   * secret, jer bez njega prijava organizatora i skenera ne postoji, a skrivanje
+   * javnog ključa daje lažni osjećaj sigurnosti.
+   *
+   * Ono što JEST tajna i nikad ne smije ovamo: HS256 `JWT_SECRET` i service ključ.
+   */
+  DOMOVINA_API_ANON_KEY?: string;
+
+  /** Adresa na koju idu alarmi rekoncilijacije i zaostale dostave. */
+  ALARM_EMAIL?: string;
+  /** Koliko minuta isti alarm šuti nakon slanja (zadano 180). */
+  ALARM_PRIGUSI_MIN?: string;
+
+  /**
+   * Odredište FIRA API-ja. Kao kod Stripea i Resenda, override je dopušten samo
+   * prema localhostu (v. `worker/racun-fira.ts::firaBase`).
+   */
+  FIRA_API_BASE?: string;
+
   // ⚠️ SAMO lokalni razvoj: preusmjeravanje vanjskih API-ja na mock.
   // Oba prihvaćaju isključivo http://127.0.0.1:* / http://localhost:* — svaka
   // druga vrijednost ruši poziv (v. stripe.ts::localStripeTarget, mail.ts::resendBase).
@@ -36,6 +58,8 @@ export interface Env {
   EVENTS_STRIPE_CONFIRM_SECRET?: string;
   DOMOVINA_API_SERVICE_KEY?: string;
   RESEND_API_KEY?: string;
+  /** FIRA Custom Webshop API ključ organizatora (header `FIRA-Api-Key`). */
+  FIRA_API_KEY?: string;
 }
 
 /** Greška s HTTP statusom — router je pretvara u JSON odgovor. */

@@ -26,6 +26,12 @@ export const DEFAULT_RULES: Record<string, Rule> = {
   webhook: { limit: 300, windowSeconds: 60 },
   // ponovna dostava e-maila: 3 u 10 minuta po narudžbi
   resend: { limit: 3, windowSeconds: 600 },
+  // prijava organizatora/skenera: 10 pokušaja u 5 min po IP-u. Ovo je jedini
+  // bucket koji brani TUĐI sustav (GoTrue) od pogađanja lozinke kroz nas.
+  prijava: { limit: 10, windowSeconds: 300 },
+  // sken na ulazu: velikodušno — na vratima se skenira u naletima, a
+  // autorizacija je ionako server-side pri svakom skenu.
+  sken: { limit: 600, windowSeconds: 60 },
 };
 
 /** Zapis "koliko/sekundi" iz env varijable ("10/600"). */

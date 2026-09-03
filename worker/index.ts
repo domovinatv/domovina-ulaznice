@@ -15,6 +15,7 @@ import { handleStripeWebhook, logMoney } from "./webhooks";
 import { reconcile } from "./reconcile";
 import { clientIp, consume } from "./ratelimit";
 import { sendEmail, ticketAttachments, ticketMail } from "./mail";
+import { QR_PREFIX } from "./qr";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -136,6 +137,12 @@ app.get("/api/zdravlje", (c) => {
     webhook: !!c.env.STRIPE_WEBHOOK_SECRET,
     hmac: !!c.env.EVENTS_STRIPE_CONFIRM_SECRET,
     mail: !!c.env.RESEND_API_KEY,
+    // prijava organizatora i skener ulaza rade samo uz anon ključ
+    prijava: !!c.env.DOMOVINA_API_ANON_KEY,
+    // alarmi bez adrese završe u logu koji nitko ne gleda
+    alarm: !!c.env.ALARM_EMAIL,
+    // račun kupcu: 'fira' tek uz ključ, inače obveza ostaje na organizatoru
+    racun: c.env.FIRA_API_KEY ? "fira" : "organizator",
     dev_override: devOverride,
     ...(devOverride && prod ? { upozorenje: "dev_override_na_produkciji" } : {}),
   });
@@ -308,10 +315,21 @@ app.get("/api/ulaznice/:order_id", async (c) => {
 /**
  * Ponovna dostava ulaznica na e-mail.
  *
- * Radi SAMO ako QR tokeni još nisu isporučeni (prvi pokušaj slanja je pao).
- * Nakon uspješne dostave plaintext u bazi više ne postoji — tada se javlja
- * `vec_isporuceno` i kupac mora potražiti izvornu poruku ili kontaktirati
- * podršku. To je cijena Tier-0 modela (u bazi samo hash) i svjesna odluka.
+ * Dva koraka, tim redoslijedom:
+ *
+ *   1. `events-tickets` — ako prva dostava nikad nije prošla, tokeni još
+ *      postoje i dovoljno ih je poslati. Ništa se ne poništava.
+ *   2. rotacija (`rotate_ticket_tokens`) — ako su tokeni potrošeni, izdaju se
+ *      NOVI, a stari prestaju vrijediti.
+ *
+ * Zašto rotacija, a ne „žao nam je": prije nje je svaki „izgubio sam mail" bio
+ * ručna intervencija podrške, a na događaju s nekoliko stotina ljudi to nije
+ * rub nego svakodnevica (U1 §Gotcha 3 je ostavio odluku otvorenom; ovo je
+ * opcija b).
+ *
+ * Cijena koju kupac mora razumjeti: **stari QR nakon ovoga ne radi.** Bez toga
+ * bi ponovna dostava bila tvornica duplikata iste ulaznice — dva QR-a za isto
+ * mjesto, oba važeća do prvog skena.
  */
 app.post("/api/ulaznice/:order_id/ponovna-dostava", async (c) => {
   const orderId = c.req.param("order_id");
@@ -327,9 +345,24 @@ app.post("/api/ulaznice/:order_id/ponovna-dostava", async (c) => {
   if (!recipient) return fail("nema_email_adrese", 409);
 
   const { orders } = await api.deliverTickets(c.env, [orderId]);
-  const tickets = orders[0]?.tickets ?? [];
+  let tickets = orders[0]?.tickets ?? [];
+  let rotirano = false;
+
   if (!tickets.some((t) => t.qr_token)) {
-    return c.json({ status: "vec_isporuceno", recipient: maskEmail(recipient) });
+    // Tokeni su potrošeni na prvoj dostavi → izdaj nove, stari prestaju vrijediti.
+    const rot = await api.rotateTicketTokens(c.env, orderId);
+    if (rot.status === "rate_limited") {
+      return fail("previse_pokusaja", 429, { retry_after: 3600 });
+    }
+    if (rot.status === "nothing_to_rotate") {
+      // sve ulaznice su iskorištene ili poništene — nema što isporučiti
+      return c.json({ status: "nema_vazecih_ulaznica", recipient: maskEmail(recipient) });
+    }
+    if (rot.status !== "rotated" || !rot.tickets?.length) {
+      return fail("rotacija_nije_uspjela", 502, { status: rot.status });
+    }
+    tickets = rot.tickets;
+    rotirano = true;
   }
 
   const { events } = await api.feed(c.env);
@@ -360,7 +393,127 @@ app.post("/api/ulaznice/:order_id/ponovna-dostava", async (c) => {
   if (res.ok) {
     await c.env.DB.prepare("DELETE FROM pending_deliveries WHERE order_id = ?").bind(orderId).run().catch(() => undefined);
   }
-  return c.json({ status: res.ok ? "poslano" : "neuspjelo", recipient: maskEmail(recipient), error: res.error });
+  return c.json({
+    status: res.ok ? "poslano" : "neuspjelo",
+    recipient: maskEmail(recipient),
+    // kupcu se MORA reći da stari QR više ne vrijedi
+    stari_qr_ponisten: rotirano,
+    error: res.error,
+  });
+});
+
+// ------------------------------------------------- organizator i skener ulaza
+//
+// Sve ispod ide U IME PRIJAVLJENOG KORISNIKA (GoTrue JWT), nikad service
+// ključem: autorizaciju drži baza (`has_role_on_account`, RLS), jer je jedina
+// koja preživi grešku u ovom fajlu. Worker je proxy koji browseru štedi anon
+// ključ i adresu jezgre.
+
+/** `Authorization: Bearer <jwt>` → JWT, ili null. */
+function bearer(c: { req: { header(n: string): string | undefined } }): string | null {
+  const h = c.req.header("authorization") ?? "";
+  const m = /^Bearer\s+(.+)$/i.exec(h.trim());
+  return m ? m[1] : null;
+}
+
+app.post("/api/organizator/prijava", async (c) => {
+  const rl = await consume(c.env, "prijava", clientIp(c.req.raw));
+  if (!rl.allowed) return fail("previse_pokusaja", 429, { retry_after: rl.retryAfter });
+
+  let body: { email?: string; lozinka?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail("bad_json");
+  }
+  const email = (body.email ?? "").trim();
+  const lozinka = body.lozinka ?? "";
+  if (!EMAIL_RE.test(email) || lozinka.length < 6) return fail("prijava_neuspjela", 401);
+
+  const p = await api.prijava(c.env, email, lozinka);
+  // Refresh token se NE vraća browseru: sesija traje koliko i access token, a
+  // produljivanje bi tražilo trajnu pohranu koju ovaj proizvod nema razloga imati.
+  return c.json({ access_token: p.access_token, expires_in: p.expires_in, email: p.user?.email ?? email });
+});
+
+app.get("/api/organizator/pregled", async (c) => {
+  const jwt = bearer(c);
+  if (!jwt) return fail("nije_prijavljen", 401);
+  const pregled = await api.korisnickiRpc<{ accounts: unknown[]; events: unknown[] }>(
+    c.env,
+    jwt,
+    "organizer_overview",
+  );
+  return c.json(pregled);
+});
+
+/**
+ * Izvoz popisa sudionika (CSV) — imenske ulaznice za jedan događaj.
+ *
+ * PII izlazi iz sustava, pa vrijede tri stvari: RLS odlučuje smije li ovaj
+ * korisnik vidjeti retke (mi ne filtriramo po accountu u kodu), izvoz je uvijek
+ * za JEDAN događaj, i datoteka se ne cachea.
+ */
+app.get("/api/organizator/holderi.csv", async (c) => {
+  const jwt = bearer(c);
+  if (!jwt) return fail("nije_prijavljen", 401);
+  const campaignId = c.req.query("campaign_id") ?? "";
+  if (!UUID_RE.test(campaignId)) return fail("invalid_campaign_id");
+
+  const redci = await api.korisnickiRest<
+    Array<{
+      serial: string;
+      holder_name: string | null;
+      holder_email: string | null;
+      state: string;
+      checked_in_at: string | null;
+    }>
+  >(
+    c.env,
+    jwt,
+    "tickets?select=serial,holder_name,holder_email,state,checked_in_at&order=serial.asc" +
+      `&campaign_id=eq.${encodeURIComponent(campaignId)}`,
+  );
+
+  const csv = [
+    "serial;ime;email;stanje;ulazak",
+    ...redci.map((r) =>
+      [r.serial, r.holder_name ?? "", r.holder_email ?? "", r.state, r.checked_in_at ?? ""]
+        .map(csvPolje)
+        .join(";"),
+    ),
+  ].join("\r\n");
+
+  // \uFEFF (BOM) + ; razdjelnik: Excel na hrvatskim postavkama inače razbije
+  // dijakritiku i strpa sve u jedan stupac.
+  return new Response(`\uFEFF${csv}`, {
+    headers: {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="sudionici-${campaignId.slice(0, 8)}.csv"`,
+      "cache-control": "no-store",
+    },
+  });
+});
+
+app.post("/api/skener/sken", async (c) => {
+  const jwt = bearer(c);
+  if (!jwt) return fail("nije_prijavljen", 401);
+  const rl = await consume(c.env, "sken", clientIp(c.req.raw));
+  if (!rl.allowed) return fail("previse_pokusaja", 429, { retry_after: rl.retryAfter });
+
+  let body: { qr_token?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail("bad_json");
+  }
+  // Skener šalje što je pročitao; normalizaciju prefiksa radi i jezgra, ali
+  // ovdje odbijamo očito smeće prije nego ode na mrežu.
+  const sirovo = (body.qr_token ?? "").trim();
+  const token = (sirovo.startsWith(QR_PREFIX) ? sirovo.slice(QR_PREFIX.length) : sirovo).toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(token)) return fail("neispravan_qr", 400);
+
+  return c.json(await api.checkin(c.env, jwt, token));
 });
 
 app.post("/webhook/stripe", async (c) => {
@@ -383,6 +536,14 @@ app.onError((err, c) => {
   console.error(`[worker] neuhvaćena greška: ${String(err?.message || err)}`);
   return fail("greska_servera", 500);
 });
+
+/** CSV polje: navodnici oko svega što ima ; " ili prijelom retka. */
+function csvPolje(v: string): string {
+  const s = String(v ?? "");
+  // Vodeći =, +, - ili @ Excel tumači kao formulu — prefiks apostrofom.
+  const sigurno = /^[=+\-@]/.test(s) ? `'${s}` : s;
+  return /[;"\r\n]/.test(sigurno) ? `"${sigurno.replace(/"/g, '""')}"` : sigurno;
+}
 
 function maskEmail(email: string | null): string | null {
   if (!email) return null;

@@ -65,13 +65,57 @@ test("ponovna dostava šalje ulaznice dok tokeni postoje", async () => {
   assert.equal(log.template, "ponovna_dostava");
 });
 
-test("ponovna dostava nakon potrošenih tokena javlja vec_isporuceno", async () => {
+test("ponovna dostava nakon potrošenih tokena ROTIRA i šalje nove QR kodove", async () => {
+  t = testEnv();
+  t.api.orderState = "paid";
+  t.api.tickets = TICKETS;
+  t.api.deliverTokens = false; // prva dostava je potrošila plaintext
+  const { body } = await callJson<{ status: string; stari_qr_ponisten: boolean }>(
+    t,
+    `/api/ulaznice/${ORDER}/ponovna-dostava`,
+    { method: "POST" },
+  );
+  assert.equal(body.status, "poslano");
+  // kupcu se MORA reći da stari QR više ne vrijedi
+  assert.equal(body.stari_qr_ponisten, true);
+  assert.equal(t.api.rotacije, 1);
+  assert.equal(t.api.emails.length, 1);
+});
+
+test("rotacija se ne poziva dok tokeni još postoje", async () => {
+  t = testEnv();
+  t.api.orderState = "paid";
+  t.api.tickets = TICKETS;
+  const { body } = await callJson<{ stari_qr_ponisten: boolean }>(
+    t,
+    `/api/ulaznice/${ORDER}/ponovna-dostava`,
+    { method: "POST" },
+  );
+  // neuspjela prva dostava se popravlja bez poništavanja ičega
+  assert.equal(t.api.rotacije, 0);
+  assert.equal(body.stari_qr_ponisten, false);
+});
+
+test("sve ulaznice iskorištene → nema što isporučiti, e-mail se ne šalje", async () => {
   t = testEnv();
   t.api.orderState = "paid";
   t.api.tickets = TICKETS;
   t.api.deliverTokens = false;
+  t.api.rotateStatus = "nothing_to_rotate";
   const { body } = await callJson<{ status: string }>(t, `/api/ulaznice/${ORDER}/ponovna-dostava`, { method: "POST" });
-  assert.equal(body.status, "vec_isporuceno");
+  assert.equal(body.status, "nema_vazecih_ulaznica");
+  assert.equal(t.api.emails.length, 0);
+});
+
+test("tvrdi limit rotacija u bazi → 429, bez e-maila", async () => {
+  t = testEnv();
+  t.api.orderState = "paid";
+  t.api.tickets = TICKETS;
+  t.api.deliverTokens = false;
+  t.api.rotateStatus = "rate_limited";
+  const { status, body } = await callJson<{ error: string }>(t, `/api/ulaznice/${ORDER}/ponovna-dostava`, { method: "POST" });
+  assert.equal(status, 429);
+  assert.equal(body.error, "previse_pokusaja");
   assert.equal(t.api.emails.length, 0);
 });
 

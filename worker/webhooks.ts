@@ -18,6 +18,7 @@ import * as api from "./api";
 import type { ConfirmResponse } from "./api";
 import { refundPaymentIntent, verifyWebhook } from "./stripe";
 import { refundMail, sendEmail, ticketAttachments, ticketMail, type EventInfo } from "./mail";
+import { izdajRacun, zapisi } from "./racun";
 
 export async function handleStripeWebhook(req: Request, env: Env): Promise<Response> {
   let event: Stripe.Event;
@@ -138,6 +139,10 @@ async function onCheckoutCompleted(
     case "paid":
     case "already_paid":
       await deliverTicketsEmail(env, orderId, confirm, payerEmail ?? null, amount);
+      // Račun TEK nakon ulaznica: račun za promet koji se nije dogodio je gora
+      // greška od zakašnjelog računa (racun.ts pravilo 1). Ne baca —
+      // neuspjeh računa ne smije poništiti kupljenu ulaznicu.
+      await izdajRacunZaNarudzbu(env, orderId, amount, payerEmail ?? null);
       return confirm.status;
 
     case "expired_sold_out":
@@ -223,6 +228,15 @@ async function onChargeRefunded(env: Env, c: Stripe.Charge, account: string | nu
     result: "ok",
     detail: res.status,
   });
+
+  // Storno računa NIJE automatiziran: FIRA storno endpoint nije u
+  // specifikaciji koju imamo, a pogađati endpoint nad fiskalnim dokumentom je
+  // skuplje od jednog ručnog koraka. Zapis mijenja status u `storniran` pa ga
+  // rekoncilijacija i organizator vide kao obvezu (v. worker/racun-fira.ts REVIEW 3).
+  await zapisi(env, { orderId, amountCents: c.amount_refunded ?? 0 }, "fira", "storniran", {
+    detail: "povrat izvršen — storno računa napraviti u FIRA sučelju",
+  }).catch(() => undefined);
+
   return `refund_${res.status}`;
 }
 
@@ -342,6 +356,55 @@ async function autoRefund(
     template: "isprika_refund",
     orderId: p.orderId,
   });
+}
+
+// -------------------------------------------------------------------- račun
+
+/**
+ * Izdaj račun kupcu na naplaćenu narudžbu.
+ *
+ * Nikad ne baca prema pozivatelju: kupac je platio i ulaznica vrijedi i ako
+ * FIRA padne. Neuspjeh ostaje u `invoices` sa statusom `neuspjeh`, a
+ * rekoncilijacija ga svakih 15 min prijavi alarmom.
+ */
+async function izdajRacunZaNarudzbu(
+  env: Env,
+  orderId: string,
+  amountCents: number,
+  payerEmail: string | null,
+): Promise<void> {
+  try {
+    const status = await api.orderStatus(env, orderId);
+    if (!status) return;
+    const email = payerEmail ?? status.order.buyer_email;
+    if (!email) {
+      // Bez e-maila nema kupca na računu. Zabilježi da obveza visi.
+      await zapisi(env, { orderId, amountCents }, "organizator", "preskocen", {
+        detail: "nema e-mail adrese kupca",
+      });
+      return;
+    }
+
+    const rail = await api.organizerRail(env, status.order.campaign_id);
+    const { events } = await api.feed(env);
+    const ev = events.find((e) => e.campaign_id === status.order.campaign_id);
+    const tier = ev?.tiers.find((t) => t.id === status.order.tier_id);
+
+    await izdajRacun(env, rail.invoice_provider, {
+      orderId,
+      amountCents,
+      quantity: status.order.quantity,
+      tierTitle: tier?.title ?? "Ulaznica",
+      kupac: { email, ime: status.tickets[0]?.holder_name ?? null },
+      event: {
+        title: ev?.title ?? "Događaj",
+        venue_city: ev?.event?.venue_city ?? null,
+        starts_at: ev?.event?.starts_at ?? null,
+      },
+    });
+  } catch (e) {
+    console.error(`[racun] priprema za ${orderId}: ${String((e as Error).message || e)}`);
+  }
 }
 
 // ------------------------------------------------------------------ pomoćnici

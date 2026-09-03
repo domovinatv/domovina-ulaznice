@@ -97,10 +97,13 @@ export const dohvatiDogadjaje = () => req<{ events: EventView[] }>("/api/dogadja
 export const dohvatiNarudzbu = (orderId: string) => req<OrderView>(`/api/ulaznice/${encodeURIComponent(orderId)}`);
 
 export const posaljiPonovno = (orderId: string) =>
-  req<{ status: string; recipient: string | null; error?: string }>(
-    `/api/ulaznice/${encodeURIComponent(orderId)}/ponovna-dostava`,
-    { method: "POST" },
-  );
+  req<{
+    status: "poslano" | "neuspjelo" | "nema_vazecih_ulaznica";
+    recipient: string | null;
+    /** true = izdani su NOVI QR kodovi, stari više ne vrijede */
+    stari_qr_ponisten?: boolean;
+    error?: string;
+  }>(`/api/ulaznice/${encodeURIComponent(orderId)}/ponovna-dostava`, { method: "POST" });
 
 export const kreirajNarudzbu = (p: {
   campaign_id: string;
@@ -195,6 +198,13 @@ export const PORUKE: Record<string, string> = {
   narudzba_nije_placena: "Narudžba još nije plaćena.",
   nema_email_adrese: "Za ovu narudžbu nemamo e-mail adresu.",
   previse_pokusaja: "Previše pokušaja — pokušajte za koju minutu.",
+  nije_prijavljen: "Prijava je istekla. Prijavite se ponovno.",
+  prijava_neuspjela: "Neispravna e-mail adresa ili lozinka.",
+  neispravan_qr: "To nije ulaznica ovog sustava.",
+  not_authorized: "Nemate ovlasti za ovaj događaj.",
+  not_authenticated: "Prijava je istekla. Prijavite se ponovno.",
+  anon_key_missing: "Prijava trenutačno nije dostupna (nedostaje konfiguracija).",
+  rotacija_nije_uspjela: "Nismo uspjeli izdati nove QR kodove. Javite se podršci.",
   stripe_not_configured: "Naplata trenutačno nije dostupna.",
   greska_servera: "Nešto je pošlo po zlu. Pokušajte ponovno.",
 };

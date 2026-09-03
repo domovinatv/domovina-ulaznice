@@ -275,16 +275,26 @@ export const deliverTickets = (
 export async function organizerRail(
   env: Env,
   campaignId: string,
-): Promise<{ connected: boolean; charges_enabled: boolean; account_id: string | null }> {
+): Promise<{
+  connected: boolean;
+  charges_enabled: boolean;
+  account_id: string | null;
+  invoice_provider: string;
+}> {
   const camps = await rest<Array<{ id: string; account_id: string }>>(
     env,
     `campaigns?select=id,account_id&id=eq.${encodeURIComponent(campaignId)}`,
   );
   const accountId = camps[0]?.account_id ?? null;
-  if (!accountId) return { connected: false, charges_enabled: false, account_id: null };
-  const rails = await rest<Array<{ stripe_account_id: string | null; stripe_charges_enabled: boolean }>>(
+  if (!accountId) {
+    return { connected: false, charges_enabled: false, account_id: null, invoice_provider: "organizator" };
+  }
+  const rails = await rest<
+    Array<{ stripe_account_id: string | null; stripe_charges_enabled: boolean; invoice_provider: string | null }>
+  >(
     env,
-    `organizer_payment_rails?select=stripe_account_id,stripe_charges_enabled&account_id=eq.${encodeURIComponent(accountId)}`,
+    "organizer_payment_rails?select=stripe_account_id,stripe_charges_enabled,invoice_provider" +
+      `&account_id=eq.${encodeURIComponent(accountId)}`,
   );
   const rail = rails[0];
   return {
@@ -292,6 +302,8 @@ export async function organizerRail(
     connected: !!rail?.stripe_account_id,
     charges_enabled: !!rail?.stripe_charges_enabled,
     account_id: accountId,
+    // tko izdaje račun kupcu; zadano obveza ostaje na organizatoru (docs/04 §2)
+    invoice_provider: rail?.invoice_provider ?? "organizator",
   };
 }
 
@@ -313,6 +325,158 @@ export async function orderStatus(
       `&contribution_id=eq.${encodeURIComponent(orderId)}`,
   );
   return { order, tickets };
+}
+
+/**
+ * Izdaj NOVE QR tokene za neiskorištene ulaznice plaćene narudžbe.
+ *
+ * Za kupca koji je izgubio e-mail. Stari QR nakon ovoga NE VRIJEDI — to je
+ * svojstvo, ne nuspojava: bez poništavanja starog bi „ponovna dostava" bila
+ * tvornica duplikata iste ulaznice. Migracija: `20260903120100` u domovina-api.
+ *
+ * ⚠️ Kao i `deliverTickets`, troši jednokratne tokene — zvati SAMO iz dostave.
+ */
+export const rotateTicketTokens = (
+  env: Env,
+  orderId: string,
+): Promise<{
+  status: "rotated" | "order_not_found" | "order_not_paid" | "nothing_to_rotate" | "rate_limited";
+  order_id?: string;
+  rotated?: number;
+  tickets?: ConfirmTicket[];
+}> => restRpc(env, "rotate_ticket_tokens", { p_order_id: orderId });
+
+// ------------------------------------------------- pozivi U IME KORISNIKA
+//
+// Sve dosad u ovoj datoteci ide sa service ključem: Worker je povjerena strana
+// i sam provjerava tko što smije. Organizatorov dashboard i skener ulaza NE
+// SMIJU tako raditi (docs/handoffs/u3 §Sigurnost 1, u4 §Sigurnost 1):
+// autorizacija mora ostati u bazi, na RLS-u i `has_role_on_account`, jer je
+// jedina koja preživi grešku u našem kodu.
+//
+// Zato ovaj blok nosi GoTrue JWT organizatora i pušta bazu da odluči. Service
+// ključ se ovdje ne pojavljuje ni u jednom headeru.
+
+/** Anon ključ je javan po dizajnu, ali bez njega Kong odbija zahtjev. */
+function anonKey(env: Env): string {
+  if (!env.DOMOVINA_API_ANON_KEY) {
+    throw new HttpError(503, "anon_key_missing", "DOMOVINA_API_ANON_KEY nije postavljen");
+  }
+  return env.DOMOVINA_API_ANON_KEY;
+}
+
+export interface Prijava {
+  access_token: string;
+  expires_in: number;
+  refresh_token?: string;
+  user?: { id: string; email?: string };
+}
+
+/**
+ * Prijava organizatora — GoTrue password grant, isti identitet kao
+ * `domovina-fiskal-app`. Worker je ovdje samo proxy: lozinka ne ostaje nigdje,
+ * a browser nikad ne vidi ni anon ključ ni adresu jezgre.
+ *
+ * ⚠️ REVIEW(fable): magic link (`/auth/v1/otp`) namjerno nije implementiran.
+ * Za osoblje na ulazu koje se prijavljuje s tuđeg mobitela u buci dvorane,
+ * čekanje e-maila je gori tok od lozinke. Ako se pokaže da organizatori ne žele
+ * dijeliti lozinku osoblju, ispravan potez nije magic link nego zaseban
+ * skener-korisnik po događaju (U3 opseg).
+ */
+export async function prijava(env: Env, email: string, lozinka: string): Promise<Prijava> {
+  const res = await fetch(`${env.DOMOVINA_API_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: anonKey(env), "content-type": "application/json" },
+    body: JSON.stringify({ email, password: lozinka }),
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    // GoTrue razlikuje krive podatke (400) od nepotvrđenog maila i rate limita.
+    throw new HttpError(res.status === 400 ? 401 : 502, res.status === 400 ? "prijava_neuspjela" : "auth_greska");
+  }
+  return JSON.parse(text) as Prijava;
+}
+
+/** PostgREST RPC U IME korisnika — RLS i `has_role_on_account` i dalje vrijede. */
+export async function korisnickiRpc<T>(
+  env: Env,
+  jwt: string,
+  fn: string,
+  args: Record<string, unknown> = {},
+): Promise<T> {
+  const res = await fetch(`${env.DOMOVINA_API_URL}/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    headers: {
+      apikey: anonKey(env),
+      Authorization: `Bearer ${jwt}`,
+      "Content-Profile": "pinka_finance",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(args),
+  });
+  const text = await res.text();
+  if (res.status === 401 || res.status === 403) throw new HttpError(401, "nije_prijavljen");
+  if (!res.ok) throw new HttpError(502, "api_rpc_error", `rpc ${fn}: ${res.status} ${text.slice(0, 200)}`);
+  return (text ? JSON.parse(text) : {}) as T;
+}
+
+/** PostgREST čitanje U IME korisnika (RLS filtrira retke, ne mi). */
+export async function korisnickiRest<T>(env: Env, jwt: string, path: string): Promise<T> {
+  const res = await fetch(`${env.DOMOVINA_API_URL}/rest/v1/${path}`, {
+    headers: {
+      apikey: anonKey(env),
+      Authorization: `Bearer ${jwt}`,
+      "Accept-Profile": "pinka_finance",
+      accept: "application/json",
+    },
+  });
+  if (res.status === 401 || res.status === 403) throw new HttpError(401, "nije_prijavljen");
+  if (!res.ok) throw new HttpError(502, "api_rest_error", `rest ${path}: ${res.status}`);
+  return (await res.json()) as T;
+}
+
+export interface CheckinRezultat {
+  status: "checked_in" | "already_checked_in" | "void" | "not_found";
+  serial?: string;
+  holder_name?: string | null;
+  tier_title?: string | null;
+  event_title?: string | null;
+  checked_in_at?: string | null;
+  checked_in_by_email?: string | null;
+  checked_in_count?: number;
+}
+
+/**
+ * Sken ulaznice na ulazu → `events-checkin`.
+ *
+ * Ovdje se namjerno KRŠI pravilo „prema events-* ide samo apikey" — ta funkcija
+ * traži `Authorization` i bez njega vraća `not_authenticated`. Pravilo je nastalo
+ * zbog `events-order`, koja na prisutan Authorization prelazi na user-client
+ * granu i pada; `events-checkin` je obrnut slučaj: user klijent JE ispravan put,
+ * jer `redeem_ticket` traži `auth.uid()` i admin rolu.
+ */
+export async function checkin(env: Env, jwt: string, qrToken: string): Promise<CheckinRezultat> {
+  const res = await fetch(`${env.DOMOVINA_API_URL}/functions/v1/events-checkin`, {
+    method: "POST",
+    headers: {
+      apikey: anonKey(env),
+      Authorization: `Bearer ${jwt}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ qr_token: qrToken }),
+  });
+  const text = await res.text();
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = text ? JSON.parse(text) : {};
+  } catch {
+    throw new HttpError(502, "api_bad_json", `events-checkin: ${text.slice(0, 200)}`);
+  }
+  if (!res.ok) {
+    const code = String(parsed.error ?? `http_${res.status}`);
+    throw new HttpError(res.status === 401 ? 401 : res.status === 403 ? 403 : 400, code);
+  }
+  return parsed as unknown as CheckinRezultat;
 }
 
 /**

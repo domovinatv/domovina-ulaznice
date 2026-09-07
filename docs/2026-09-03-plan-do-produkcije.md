@@ -289,3 +289,28 @@ to stane, ali bez rezerve.
    nad stvarnim Stripeom.
 </content>
 </invoke>
+
+---
+
+## 10. Dopuna 2026-09-06 — što je izbacila konkurentska analiza
+
+> Dopisano nakon usporedbe s Ticket Tailorom
+> ([08](08-konkurencija-i-trziste.md), [09](09-usporedba-ticket-tailor.md)).
+> Ostatak dokumenta stoji kakav je bio 3. 9.; ovdje su **samo tri stavke koje
+> gornji plan nema, a trebao bi**.
+
+| # | Stavka | Zašto nije u §3/§4 gore | Razred u [09](09-usporedba-ticket-tailor.md) |
+| --- | --- | --- | --- |
+| 1 | **Skener ne radi na iPhoneu** | `BarcodeDetector` ne postoji u Safariju (`src/pages/Skener.tsx:32`, postojeći `REVIEW(fable)`). Plan gore tretira U4 kao gotov jer skener *postoji* — ali na uređaju koji će volonter najvjerojatnije donijeti ne radi, a fallback je ručni prijepis koda. | B10 |
+| 2 | **Offline plaćanja (IBAN, na vratima, predračun)** | Plan pretpostavlja da je platforma napredak u odnosu na Google Forms + IBAN. Za dio kupaca nije: PzS danas **prima uplate na IBAN**, a mi taj kanal nemamo. Prelaskom bi ga izgubili. | A4 |
+| 3 | **Embed checkouta na organizatorovu stranicu** | `README` i `docs/01` §1 obećavaju „prodaja s vlastite stranice"; kod šalje kupca na `ulaznice.domovina.ai`. Za PzS pilot nije blokada, za pozicioniranje jest. | A7 |
+
+**Preporuka za redoslijed:** stavka 1 ide **prije** pilota i ispred svega u §4 —
+to je jedina stavka koja kvari na dan događaja, pred redom ljudi, bez zaobilaznice.
+Rješenje je QR dekoder koji ne ovisi o `BarcodeDetector`u (`jsQR` ili WASM), pola
+do jedan dan posla. Stavka 2 mora biti riješena ili **izrijekom dogovorena s
+Belavićem** prije nego mu se prodaja obeća — to je pitanje za §7, ne za kod.
+
+Ono što analiza **ne** mijenja: ništa u §3 (P0) ne pada i ništa se ne dodaje u P0.
+Cjenovna teza (0 %) i dalje stoji, ali argument je jači prema Entriju nego prema
+Ticket Tailoru — v. [09](09-usporedba-ticket-tailor.md) §3.1.

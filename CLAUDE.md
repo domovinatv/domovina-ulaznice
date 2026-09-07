@@ -29,6 +29,9 @@ Stanje, zamke i otvorena pitanja: `docs/2026-08-08-deploy-okruzenja-i-stripe.md`
 2. `docs/05-podatkovni-model.md` — što postoji, što je novo
 3. `docs/07-prior-art-reuse-mapa.md` — odakle se što kopira
 4. `docs/handoffs/README.md` — kako izgleda faza
+5. `docs/08-konkurencija-i-trziste.md` — tko su konkurenti (Ticket Tailor,
+   Entrio, Upad, pretix…) i za što se **ne** natječemo; `docs/09` je usporedba
+   s Ticket Tailorom funkcija po funkciju + rangirani popis onoga što fali
 
 ## Četiri pravila koja se ne krše
 

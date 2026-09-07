@@ -85,6 +85,8 @@ platio i inače.
 | 05  | [Podatkovni model](docs/05-podatkovni-model.md)                 | što postoji u `pinka_finance`, što je novo za Stripe rail    |
 | 06  | [Faze i roadmap](docs/06-faze-roadmap.md)                       | U1–U6, ovisnosti, definicija MVP-a                           |
 | 07  | [Prior art i reuse mapa](docs/07-prior-art-reuse-mapa.md)       | što se kopira iz kojeg repoa i zašto                         |
+| 08  | [Konkurencija i tržište](docs/08-konkurencija-i-trziste.md)     | tko su konkurenti globalno i u HR, gdje je naš prostor       |
+| 09  | [Usporedba s Ticket Tailorom](docs/09-usporedba-ticket-tailor.md) | funkcija po funkciju: zajedničko, bolje, što nedostaje      |
 |     | [Nalazi lokalne verifikacije](docs/2026-08-04-lokalna-verifikacija-i-nalazi.md) | odbačene alternative, zamke, mjerenja, otvoreno |
 |     | [Handoffi](docs/handoffs/README.md)                             | samodostatni promptovi po fazi                               |
 

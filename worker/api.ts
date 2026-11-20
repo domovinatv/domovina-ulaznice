@@ -151,6 +151,8 @@ export interface FeedEvent {
     cover_image_url: string | null;
     // S2b: nullable; undefined dok jezgra nema migraciju events_venue_geo
     cover_image_alt?: string | null;
+    // galerija: [] kad je nema; undefined dok jezgra nema migraciju events_gallery
+    gallery?: Array<{ url: string; alt?: string | null }>;
     venue_lat?: number | null;
     venue_lon?: number | null;
     organizer_name: string;
@@ -402,6 +404,41 @@ export async function prijava(env: Env, email: string, lozinka: string): Promise
   return JSON.parse(text) as Prijava;
 }
 
+/**
+ * Prijava kodom na e-mail, korak 1: GoTrue šalje jednokratni kod (OTP).
+ *
+ * `create_user: false` — kod dobiva samo postojeći domovina.ai račun; ulaznice
+ * ne otvaraju nove račune. GoTrue za nepoznat mail vraća grešku, ali je Worker
+ * ne prosljeđuje (v. rutu), da se kroz nas ne može provjeravati tko ima račun.
+ *
+ * Ovo je odgovor na REVIEW(fable) iznad samo za organizatora za stolom; lozinka
+ * ostaje drugi put u istom obrascu, pa skener na ulazu radi kao i prije.
+ */
+export async function posaljiKod(env: Env, email: string): Promise<void> {
+  const res = await fetch(`${env.DOMOVINA_API_URL}/auth/v1/otp`, {
+    method: "POST",
+    headers: { apikey: anonKey(env), "content-type": "application/json" },
+    body: JSON.stringify({ email, create_user: false }),
+  });
+  await res.text();
+  // 429 = GoTrueov limit slanja maila; ostale 4xx (nepoznat mail) se gutaju.
+  if (res.status === 429) throw new HttpError(429, "previse_pokusaja");
+  if (res.status >= 500) throw new HttpError(502, "auth_greska");
+}
+
+/** Korak 2: kod iz maila → sesija, isti oblik kao password grant. */
+export async function potvrdiKod(env: Env, email: string, kod: string): Promise<Prijava> {
+  const res = await fetch(`${env.DOMOVINA_API_URL}/auth/v1/verify`, {
+    method: "POST",
+    headers: { apikey: anonKey(env), "content-type": "application/json" },
+    body: JSON.stringify({ type: "email", email, token: kod }),
+  });
+  const text = await res.text();
+  if (res.status === 429) throw new HttpError(429, "previse_pokusaja");
+  if (!res.ok) throw new HttpError(res.status < 500 ? 401 : 502, res.status < 500 ? "kod_neispravan" : "auth_greska");
+  return JSON.parse(text) as Prijava;
+}
+
 /** PostgREST RPC U IME korisnika — RLS i `has_role_on_account` i dalje vrijede. */
 export async function korisnickiRpc<T>(
   env: Env,
@@ -482,6 +519,52 @@ export async function checkin(env: Env, jwt: string, qrToken: string): Promise<C
     throw new HttpError(res.status === 401 ? 401 : res.status === 403 ? 403 : 400, code);
   }
   return parsed as unknown as CheckinRezultat;
+}
+
+/**
+ * Novi događaj iz editora organizatora → `events-organizer` (`action: create`).
+ *
+ * Kao i kod skenera, ide KORISNIKOVIM JWT-om: `create_event` je security
+ * invoker i RLS traži admina računa s provjerenim identitetom (KYC). Događaj
+ * nastaje kao privatna skica; objava je zaseban `publish_event`.
+ *
+ * `event_id` šalje klijent, pa je ponovljeni zahtjev (npr. nakon prekida mreže)
+ * isti događaj, ne duplikat (`create_event` je idempotentan po `p_id`).
+ */
+export async function kreirajDogadjaj(
+  env: Env,
+  jwt: string,
+  podaci: Record<string, unknown>,
+): Promise<{ id: string; slug: string; existing: boolean }> {
+  const res = await fetch(`${env.DOMOVINA_API_URL}/functions/v1/events-organizer`, {
+    method: "POST",
+    headers: {
+      apikey: anonKey(env),
+      Authorization: `Bearer ${jwt}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ ...podaci, action: "create" }),
+  });
+  const text = await res.text();
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = text ? JSON.parse(text) : {};
+  } catch {
+    throw new HttpError(502, "api_bad_json", `events-organizer: ${text.slice(0, 200)}`);
+  }
+  if (!res.ok) {
+    if (res.status === 401) throw new HttpError(401, "nije_prijavljen");
+    const code = String(parsed.error ?? `http_${res.status}`);
+    // RLS odbijanje („new row violates row-level security policy”) funkcija
+    // skrati u „new”: korisnik nije admin računa ili nema provjeren identitet.
+    if (code === "new" || /row-level security/.test(code)) throw new HttpError(403, "nema_prava_kreiranja");
+    // funkcija vraća 400 i za sirove poruke baze; prema browseru idu samo strojni kodovi
+    if (res.status >= 500 || !/^[a-z_]+$/.test(code)) {
+      throw new HttpError(502, "api_error", `events-organizer: ${res.status} ${text.slice(0, 200)}`);
+    }
+    throw new HttpError(400, code);
+  }
+  return parsed as { id: string; slug: string; existing: boolean };
 }
 
 /**

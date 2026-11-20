@@ -31,12 +31,19 @@ export interface EventDetails {
   cover_image_url: string | null;
   /** Alt tekst naslovne slike, ≤ 300 znakova (S2b, odluka 15). */
   cover_image_alt?: string | null;
+  /** Dodatne slike redom prikaza, ≤ 20 (migracija `events_gallery`). Opcionalno dok je jezgra nema. */
+  gallery?: GallerySlika[];
   /** WGS84; oba ili nijedno (S2b, odluka 14). Opcionalno dok jezgra nema migraciju. */
   venue_lat?: number | null;
   venue_lon?: number | null;
   organizer_name: string;
   organizer_email: string | null;
   organizer_web: string | null;
+}
+
+export interface GallerySlika {
+  url: string;
+  alt?: string | null;
 }
 
 export interface EventView {

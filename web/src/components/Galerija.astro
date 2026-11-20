@@ -1,0 +1,237 @@
+---
+// Mala galerija stranice događaja: mreža sličica ispod „Dodaj u kalendar”,
+// klik otvara preglednik (<dialog>) s listanjem strelicama, tipkovnicom i
+// povlačenjem prstom. Bez React otoka: nekoliko redaka skripte, a bez JS-a
+// sličice su obični linkovi na punu sliku.
+//
+// Sličica je najviše VIDLJIVIH (zadnja nosi „+N”), preglednik lista sve.
+import type { SlikaGalerije } from "../lib/galerija.ts";
+import Ikona from "./Ikona.astro";
+
+interface Props {
+  slike: SlikaGalerije[];
+}
+
+const VIDLJIVIH = 8;
+const { slike } = Astro.props;
+const sakriveno = Math.max(0, slike.length - VIDLJIVIH);
+---
+<div class="galerija" data-galerija>
+  <ul class="mreza">
+    {
+      slike.slice(0, VIDLJIVIH).map((s, i) => (
+        <li>
+          <a href={s.url} class="slicica" data-indeks={i} aria-label={`Otvori sliku ${i + 1} od ${slike.length}: ${s.alt}`}>
+            <img src={s.url} alt="" loading="lazy" decoding="async" />
+            {sakriveno > 0 && i === VIDLJIVIH - 1 && <span class="jos" aria-hidden="true">+{sakriveno + 1}</span>}
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+
+  <dialog class="preglednik" aria-label="Galerija slika">
+    <div class="okvir">
+      <img class="velika" alt="" />
+      <p class="brojac" aria-live="polite"></p>
+      <button type="button" class="tipka zatvori" data-zatvori aria-label="Zatvori galeriju">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <path d="M6 6l12 12M18 6 6 18" />
+        </svg>
+      </button>
+      <button type="button" class="tipka strelica prethodna" data-korak="-1" aria-label="Prethodna slika">
+        <Ikona ime="natrag" velicina={24} />
+      </button>
+      <button type="button" class="tipka strelica sljedeca" data-korak="1" aria-label="Sljedeća slika">
+        <Ikona ime="natrag" velicina={24} class="okrenuta" />
+      </button>
+    </div>
+  </dialog>
+
+  <script type="application/json" data-slike set:html={JSON.stringify(slike).replace(/</g, "\\u003c")} />
+</div>
+
+<script>
+  interface Slika {
+    url: string;
+    alt: string;
+  }
+
+  for (const korijen of document.querySelectorAll<HTMLElement>("[data-galerija]")) {
+    const slike: Slika[] = JSON.parse(korijen.querySelector("[data-slike]")?.textContent ?? "[]");
+    const dialog = korijen.querySelector("dialog")!;
+    const velika = dialog.querySelector<HTMLImageElement>(".velika")!;
+    const brojac = dialog.querySelector<HTMLElement>(".brojac")!;
+    let indeks = 0;
+
+    const prikazi = (i: number) => {
+      indeks = (i + slike.length) % slike.length;
+      velika.src = slike[indeks].url;
+      velika.alt = slike[indeks].alt;
+      brojac.textContent = `${indeks + 1} / ${slike.length}`;
+      // susjedne slike unaprijed, da listanje ne čeka mrežu
+      for (const k of [-1, 1]) new Image().src = slike[(indeks + k + slike.length) % slike.length].url;
+    };
+
+    korijen.querySelectorAll<HTMLAnchorElement>(".slicica").forEach((a) =>
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        prikazi(Number(a.dataset.indeks));
+        dialog.showModal();
+      }),
+    );
+    dialog.querySelectorAll<HTMLButtonElement>("[data-korak]").forEach((b) =>
+      b.addEventListener("click", () => prikazi(indeks + Number(b.dataset.korak))),
+    );
+    dialog.querySelector("[data-zatvori]")!.addEventListener("click", () => dialog.close());
+    // klik na tamnu pozadinu (sam <dialog>, ne njegov sadržaj) zatvara
+    dialog.addEventListener("click", (e) => {
+      if (e.target === dialog || e.target === dialog.firstElementChild) dialog.close();
+    });
+    dialog.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") prikazi(indeks - 1);
+      if (e.key === "ArrowRight") prikazi(indeks + 1);
+    });
+
+    let pocetakX: number | null = null;
+    dialog.addEventListener("touchstart", (e) => (pocetakX = e.touches[0].clientX), { passive: true });
+    dialog.addEventListener("touchend", (e) => {
+      if (pocetakX === null) return;
+      const pomak = e.changedTouches[0].clientX - pocetakX;
+      pocetakX = null;
+      if (Math.abs(pomak) > 40) prikazi(indeks + (pomak < 0 ? 1 : -1));
+    });
+
+    if (slike.length < 2) dialog.querySelectorAll<HTMLElement>(".strelica").forEach((b) => (b.hidden = true));
+  }
+</script>
+
+<style>
+  .mreza {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .slicica {
+    position: relative;
+    display: block;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    border-radius: var(--radius-md);
+    background: var(--color-neutral-bg);
+  }
+  .slicica img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.2s ease;
+  }
+  .slicica:hover img {
+    transform: scale(1.05);
+  }
+  .slicica:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  .jos {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgb(0 0 0 / 0.55);
+    color: #fff;
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+  }
+
+  .preglednik {
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: rgb(10 12 10 / 0.95);
+    color: #fff;
+  }
+  .preglednik::backdrop {
+    background: transparent;
+  }
+  .okvir {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 56px 72px;
+  }
+  .velika {
+    /* postotak visine u grid ćeliji ne ograničava, pa visina ide od viewporta */
+    max-width: 100%;
+    max-height: calc(100dvh - 112px);
+    object-fit: contain;
+    border-radius: var(--radius-md);
+    user-select: none;
+  }
+  .brojac {
+    position: absolute;
+    bottom: 18px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: var(--font-size-sm);
+    color: rgb(255 255 255 / 0.85);
+  }
+  .tipka {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: rgb(255 255 255 / 0.14);
+    color: #fff;
+    cursor: pointer;
+  }
+  .tipka:hover {
+    background: rgb(255 255 255 / 0.26);
+  }
+  .tipka:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
+  .zatvori {
+    top: 14px;
+    right: 14px;
+  }
+  .strelica {
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .prethodna {
+    left: 14px;
+  }
+  .sljedeca {
+    right: 14px;
+  }
+  .sljedeca :global(.okrenuta) {
+    transform: scaleX(-1);
+  }
+
+  @media (max-width: 719px) {
+    .okvir {
+      padding: 56px 8px;
+    }
+    .strelica {
+      top: auto;
+      bottom: 8px;
+      transform: none;
+    }
+  }
+</style>

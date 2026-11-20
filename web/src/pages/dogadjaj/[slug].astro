@@ -4,7 +4,7 @@
 // stanja tierova, „Kupi” samo kad je `kupovno`, inače razlog zašto nije,
 // banner ?otkazano=1 nakon prekinutog plaćanja.
 //
-// Raspored: na računalu dva stupca (ploha, organizator, kalendar lijevo;
+// Raspored: na računalu dva stupca (ploha, organizator, kalendar, galerija lijevo;
 // naslov, termin, cjenik, opis, lokacija desno). Na mobitelu jedan stupac
 // redoslijedom iz Dogadjaj-390; stupci su tada `display: contents`, pa im se
 // djeca slažu kroz `order` bez dupliciranja sadržaja.
@@ -14,6 +14,7 @@ import Osnovni from "../../layouts/Osnovni.astro";
 import Banner from "../../components/Banner.astro";
 import Cjenik from "../../components/Cjenik.astro";
 import DatumskaPlocica from "../../components/DatumskaPlocica.astro";
+import Galerija from "../../components/Galerija.astro";
 import Gumb from "../../components/Gumb.astro";
 import NaslovnaPloha from "../../components/NaslovnaPloha.astro";
 import Odjeljak from "../../components/Odjeljak.astro";
@@ -35,6 +36,7 @@ import {
   terminDogadjaja,
   vrstaDogadjaja,
 } from "../../lib/format.ts";
+import { slikeGalerije } from "../../lib/galerija.ts";
 import { googleKalendarUrl } from "../../lib/kalendar.ts";
 import { adresa, koordinate, linkoviKarte, punoMjesto } from "../../lib/karta.ts";
 import { opisHtml, opisTekst } from "../../lib/opis.ts";
@@ -68,6 +70,9 @@ const termin = terminDogadjaja(d?.starts_at, d?.ends_at, zona);
 const ploha = datumPlohe(d?.starts_at, d?.ends_at, zona);
 const naslovnaUrl = sigurniUrl(d?.cover_image_url) ?? sigurniUrl(dogadjaj?.brand?.hero_url);
 const naslovnaAlt = d?.cover_image_alt?.trim() || null;
+const galerija = dogadjaj
+  ? slikeGalerije(d, naslovnaUrl ? { url: naslovnaUrl, alt: naslovnaAlt } : null, dogadjaj.title)
+  : [];
 const mjestoKratko = [d?.venue_name, d?.venue_city].filter(Boolean).join(" · ");
 const adresaMjesta = adresa(d);
 const k = koordinate(d);
@@ -175,6 +180,12 @@ const metaOpis =
                 <Gumb varijanta="sekundarni" href={kalendar.google} rel="noopener">Google Kalendar</Gumb>
                 <Gumb varijanta="sekundarni" href={kalendar.ics} download>.ics (Apple, Outlook)</Gumb>
               </div>
+            </Odjeljak>
+          )}
+
+          {galerija.length > 1 && (
+            <Odjeljak naslov="Galerija" id="galerija" class="o-galerija">
+              <Galerija slike={galerija} />
             </Odjeljak>
           )}
         </div>
@@ -355,6 +366,10 @@ const metaOpis =
       order: 0;
     }
     .ploha {
+      order: 1;
+    }
+    /* Galerija odmah ispod naslovne slike (isti order, DOM je drži iza plohe). */
+    .dogadjaj :global(.o-galerija) {
       order: 1;
     }
     .naslov {

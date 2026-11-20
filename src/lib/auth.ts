@@ -88,11 +88,27 @@ async function json<T>(path: string, init: RequestInit, token?: string): Promise
   return body as T;
 }
 
+type Token = { access_token: string; expires_in: number; email: string };
+
 export async function prijavi(email: string, lozinka: string): Promise<Sesija> {
-  const r = await json<{ access_token: string; expires_in: number; email: string }>(
-    "/api/organizator/prijava",
-    { method: "POST", body: JSON.stringify({ email, lozinka }) },
+  return sesijaIz(
+    await json<Token>("/api/organizator/prijava", { method: "POST", body: JSON.stringify({ email, lozinka }) }),
   );
+}
+
+/** Prijava kodom, korak 1. Odgovor je isti postoji li račun ili ne. */
+export async function posaljiKod(email: string): Promise<void> {
+  await json("/api/organizator/kod", { method: "POST", body: JSON.stringify({ email }) });
+}
+
+/** Prijava kodom, korak 2: kod iz maila → sesija. */
+export async function potvrdiKod(email: string, kod: string): Promise<Sesija> {
+  return sesijaIz(
+    await json<Token>("/api/organizator/potvrdi", { method: "POST", body: JSON.stringify({ email, kod }) }),
+  );
+}
+
+function sesijaIz(r: Token): Sesija {
   // 60 s rezerve da zahtjev ne krene sekundu prije isteka
   const s: Sesija = {
     access_token: r.access_token,
@@ -132,6 +148,13 @@ export interface OrgPregled {
 
 export const dohvatiPregled = (token: string): Promise<OrgPregled> =>
   json<OrgPregled>("/api/organizator/pregled", { method: "GET" }, token);
+
+/** Editor: nova privatna skica događaja (tijelo složi `src/lib/editor.ts`). */
+export const kreirajDogadjaj = (
+  token: string,
+  tijelo: Record<string, unknown>,
+): Promise<{ id: string; slug: string; existing: boolean }> =>
+  json("/api/organizator/dogadjaj", { method: "POST", body: JSON.stringify(tijelo) }, token);
 
 export interface SkenRezultat {
   status: "checked_in" | "already_checked_in" | "void" | "not_found";

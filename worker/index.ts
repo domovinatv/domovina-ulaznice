@@ -563,6 +563,44 @@ app.post("/api/organizator/prijava", async (c) => {
   return c.json({ access_token: p.access_token, expires_in: p.expires_in, email: p.user?.email ?? email });
 });
 
+// Prijava kodom na e-mail. Isti bucket kao lozinka: kod je 6 znamenki, pa je
+// limit po IP-u ono što brani od pogađanja (uz GoTrueov istek koda).
+app.post("/api/organizator/kod", async (c) => {
+  const rl = await consume(c.env, "prijava", clientIp(c.req.raw));
+  if (!rl.allowed) return fail("previse_pokusaja", 429, { retry_after: rl.retryAfter });
+
+  let body: { email?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail("bad_json");
+  }
+  const email = (body.email ?? "").trim();
+  if (!EMAIL_RE.test(email) || email.length > 200) return fail("invalid_buyer_email");
+
+  await api.posaljiKod(c.env, email);
+  // Uvijek isti odgovor, postojao račun ili ne.
+  return c.json({ ok: true });
+});
+
+app.post("/api/organizator/potvrdi", async (c) => {
+  const rl = await consume(c.env, "prijava", clientIp(c.req.raw));
+  if (!rl.allowed) return fail("previse_pokusaja", 429, { retry_after: rl.retryAfter });
+
+  let body: { email?: string; kod?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail("bad_json");
+  }
+  const email = (body.email ?? "").trim();
+  const kod = (body.kod ?? "").replace(/\s/g, "");
+  if (!EMAIL_RE.test(email) || !/^\d{6,10}$/.test(kod)) return fail("kod_neispravan", 401);
+
+  const p = await api.potvrdiKod(c.env, email, kod);
+  return c.json({ access_token: p.access_token, expires_in: p.expires_in, email: p.user?.email ?? email });
+});
+
 app.get("/api/organizator/pregled", async (c) => {
   const jwt = bearer(c);
   if (!jwt) return fail("nije_prijavljen", 401);
@@ -620,6 +658,34 @@ app.get("/api/organizator/holderi.csv", async (c) => {
       "cache-control": "no-store",
     },
   });
+});
+
+/**
+ * Editor događaja: nova privatna skica. Worker propušta samo poznata polja i
+ * odbija očito smeće prije mreže; prava validacija (i tko smije) je u
+ * `create_event` u bazi. Galerija, koordinate i objava još nisu ovdje.
+ */
+app.post("/api/organizator/dogadjaj", async (c) => {
+  const jwt = bearer(c);
+  if (!jwt) return fail("nije_prijavljen", 401);
+
+  let body: Record<string, unknown>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return fail("bad_json");
+  }
+  if (!UUID_RE.test(String(body.event_id ?? ""))) return fail("invalid_event_id");
+  if (!UUID_RE.test(String(body.account_id ?? ""))) return fail("invalid_account_id");
+  if (!Array.isArray(body.tiers) || body.tiers.length === 0) return fail("invalid_tiers");
+
+  const POLJA = [
+    "event_id", "account_id", "title", "event_type", "starts_at", "ends_at", "timezone",
+    "venue_name", "venue_address", "venue_city", "description_hr", "cover_image_url",
+    "organizer_name", "organizer_email", "organizer_web", "tiers",
+  ];
+  const podaci = Object.fromEntries(POLJA.filter((k) => k in body).map((k) => [k, body[k]]));
+  return c.json(await api.kreirajDogadjaj(c.env, jwt, podaci));
 });
 
 app.post("/api/skener/sken", async (c) => {

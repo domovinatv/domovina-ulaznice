@@ -163,6 +163,9 @@ const IZVAN_KUPNJE: Readonly<Record<string, string>> = {
   anon_key_missing: "api.ts anonKey — prijava organizatora i skener",
   prijava_neuspjela: "api.ts prijava — /api/organizator/prijava",
   auth_greska: "api.ts prijava — /api/organizator/prijava",
+  kod_neispravan: "api.ts potvrdiKod — /api/organizator/potvrdi (SPA, ne Astro)",
+  nema_prava_kreiranja: "api.ts kreirajDogadjaj — /api/organizator/dogadjaj (SPA editor)",
+  api_error: "api.ts kreirajDogadjaj — /api/organizator/dogadjaj (SPA editor)",
   nije_prijavljen: "api.ts korisnickiRpc/korisnickiRest — organizator i skener",
   api_rail_update_failed: "api.ts upsertOrganizerRail — webhooks.ts (account.updated)",
 };

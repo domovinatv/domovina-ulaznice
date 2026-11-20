@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { eur, poruka } from "../lib/api";
 import {
   AuthError,
@@ -13,7 +14,8 @@ import {
 import Prijava from "./Prijava";
 
 /**
- * Pregled prodaje za organizatora — čitanje, ne uređivanje.
+ * Pregled prodaje za organizatora. Novi događaj je zasebna stranica
+ * (/organizator/novi, NoviDogadjaj.tsx); uređivanje postojećeg još ne postoji.
  *
  * Namjerno uzak opseg: organizator mora moći vidjeti koliko je prodano i
  * izvesti popis sudionika bez da nas zove. Uređivanje događaja, Stripe
@@ -62,6 +64,11 @@ export default function Organizator() {
         </button>
       </div>
       <p className="meta">{sesija.email}</p>
+      <p style={{ margin: "14px 0 18px" }}>
+        <Link className="gumb" to="/organizator/novi">
+          + Novi događaj
+        </Link>
+      </p>
 
       {greska && <div className="greska">{greska}</div>}
       {!pregled && !greska && <p className="mutno">Učitavanje…</p>}
@@ -104,7 +111,11 @@ function Dogadjaj({ d, token }: { d: OrgEvent; token: string }) {
           <strong>{d.title}</strong>
           <div className="mutno">
             {d.event?.venue_city ?? ""} ·{" "}
-            {d.state === "active" ? <span className="oznaka oznaka--ok">objavljen</span> : <span className="oznaka">{d.state}</span>}
+            {d.state === "active" ? (
+              <span className="oznaka oznaka--ok">objavljen</span>
+            ) : (
+              <span className="oznaka">{d.state === "draft" ? "skica" : d.state}</span>
+            )}
           </div>
         </div>
         <div style={{ textAlign: "right" }}>

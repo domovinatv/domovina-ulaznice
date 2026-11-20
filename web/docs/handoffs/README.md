@@ -40,6 +40,7 @@ Ovaj lanac je odvojen od `docs/handoffs/` u korijenu (faze U1–U7).
 | S5 | narudžba, pravno, 404 | gotovo | 0e39ef1 | web 133, korijen 99 | Ivan, 2026-11-20; odluke 500–517; QR namjerno ne (501); `npm run e2e` |
 | S6 | service binding, lokalna e2e | gotovo | 346b57b | web 133, korijen 108 | Ivan, 2026-11-20; odluke 600–607; `e2e:stack` kroz :8788 |
 | — | (!) staging deploy | čeka | | | Matija |
+| — | izvan lanca: prijava kodom, galerija, editor događaja | gotovo | a423316 | korijen 126, web 137 | Ivan, 2026-11-20; `docs/2026-11-20-prijava-kodom-galerija-editor.md`, deploy-dug #7–#9 |
 | S7 | mjerenje, čišćenje SPA-a, dokumentacija | otvoreno | | | |
 
 ## Zajednička pravila (vrijede u svakoj sesiji)

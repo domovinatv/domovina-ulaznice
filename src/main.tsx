@@ -8,6 +8,7 @@ import Kupnja from "./pages/Kupnja";
 import Narudzba from "./pages/Narudzba";
 import Skener from "./pages/Skener";
 import Organizator from "./pages/Organizator";
+import NoviDogadjaj from "./pages/NoviDogadjaj";
 import { Privatnost, Uvjeti } from "./pages/Pravno";
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
             svakom pozivu, ruta je samo ulaz. */}
         <Route path="/skener" element={<Skener />} />
         <Route path="/organizator" element={<Organizator />} />
+        <Route path="/organizator/novi" element={<NoviDogadjaj />} />
         <Route path="/uvjeti" element={<Uvjeti />} />
         <Route path="/privatnost" element={<Privatnost />} />
         <Route path="*" element={<Navigate to="/" replace />} />

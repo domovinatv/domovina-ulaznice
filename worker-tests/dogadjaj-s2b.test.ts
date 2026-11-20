@@ -39,3 +39,21 @@ test("null koordinate ostaju null, a jezgra bez migracije ne dobiva izmišljena 
   assert.equal(stari.status, 200);
   assert.ok(!("venue_lat" in stari.body.event));
 });
+
+test("galerija prolazi cijela i redom; jezgra bez migracije je nema", async () => {
+  t = testEnv();
+  const gallery = [
+    { url: "https://slike.hr/1.jpg", alt: "Prva" },
+    { url: "https://slike.hr/2.jpg", alt: null },
+  ];
+  t.api.eventExtra = { gallery };
+  const detalj = await callJson<Dogadjaj>(t, "/api/dogadjaj/susret-2027");
+  assert.deepEqual(detalj.body.event.gallery, gallery);
+  const popis = await callJson<{ events: Dogadjaj[] }>(t, "/api/dogadjaji");
+  assert.deepEqual(popis.body.events[0].event.gallery, gallery);
+
+  t.restore();
+  t = testEnv();
+  const stari = await callJson<Dogadjaj>(t, "/api/dogadjaj/susret-2027");
+  assert.ok(!("gallery" in stari.body.event));
+});
